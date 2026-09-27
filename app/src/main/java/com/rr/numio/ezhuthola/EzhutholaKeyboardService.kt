@@ -21,6 +21,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.rr.numio.ezhuthola.engine.EnglishSuggester
 import com.rr.numio.ezhuthola.engine.MalayalamEngine
 import com.rr.numio.ezhuthola.engine.MalayalamRules
 import com.rr.numio.ezhuthola.engine.MalayalamSuggester
@@ -30,9 +31,10 @@ import com.rr.numio.ezhuthola.engine.WordFrequencies
 /**
  * The keyboard itself. Android starts this service whenever Ezhuthola is the active keyboard.
  *
- * Malayalam mode: letters are collected into a Manglish word ("paranju"). While typing, the
- * best Malayalam spelling is shown underlined in the app (composing text) and the strip shows
- * options. Space, punctuation or enter commits the best word; tapping a chip commits that one.
+ * Letters are collected into the word being typed. In Malayalam mode ("paranju") the best
+ * Malayalam spelling is shown underlined and the strip shows options; in English mode the word
+ * stays as typed and the strip offers completions ("tomo" → tomorrow).
+ * Space, punctuation or enter commits the word; tapping a chip commits that one.
  *
  * A service has no lifecycle of its own, but Compose needs one, so this class provides it
  * (LifecycleOwner + SavedStateRegistryOwner) and attaches it to the keyboard window.
@@ -56,6 +58,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     /** Loaded in the background at start-up; null for the first moment. */
     @Volatile private var suggester: MalayalamSuggester? = null
+    @Volatile private var english: EnglishSuggester? = null
 
     /** Password, email and web-address fields always get plain English. */
     private var plainField = false
@@ -73,6 +76,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                 WordFrequencies.fromTsv(it)
             }
             suggester = MalayalamSuggester(MalayalamEngine(rules), words)
+            english = assets.open("en_words.tsv").bufferedReader().useLines {
+                EnglishSuggester.fromTsv(it)
+            }
         }.start()
     }
 
@@ -152,16 +158,19 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     // ---- Keys --------------------------------------------------------------
 
+    /**
+     * Switching mid-word converts the word being typed instead of finishing it:
+     * type "nal", tap the leaf, and it becomes Malayalam; keep typing "e" → നാളെ.
+     */
     private fun toggleLanguage() {
-        commitWord()
         malayalam = !malayalam
+        if (word.isNotEmpty() && !plainField) refreshWord()
     }
 
     private fun onKeyText(text: String) {
-        val composesMalayalam = malayalam && !plainField
         when {
-            // A Manglish letter: add it to the word being typed.
-            composesMalayalam && text.length == 1 && text[0].isAsciiLetter() -> {
+            // A letter: add it to the word being typed (Manglish or English).
+            !plainField && text.length == 1 && text[0].isAsciiLetter() -> {
                 word.append(text)
                 refreshWord()
             }
@@ -224,11 +233,19 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     // ---- Composing ---------------------------------------------------------
 
-    /** Show the best Malayalam for the letters so far, underlined, and update the strip. */
+    /**
+     * Update the underlined word and the strip.
+     * Malayalam: shows the best Malayalam spelling. English: shows exactly what was typed,
+     * with word completions in the strip.
+     */
     private fun refreshWord() {
         val typed = word.toString()
-        val s = suggester?.suggest(typed)
-            ?: Suggestions(typed = typed, best = typed, words = emptyList()) // still loading
+        val loading = Suggestions(typed = typed, best = typed, words = emptyList())
+        val s = if (malayalam) {
+            suggester?.suggest(typed) ?: loading
+        } else {
+            english?.suggest(typed) ?: loading
+        }
         suggestions = s
         currentInputConnection?.setComposingText(s.best, 1)
     }
@@ -263,8 +280,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                 InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
                 InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
                 InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
-                InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS,
-                InputType.TYPE_TEXT_VARIATION_URI
+                InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
+                // Not TYPE_TEXT_VARIATION_URI: browser address bars use it, and people
+                // search in Malayalam there. The leaf key switches to English for URLs.
             )
             else -> false
         }

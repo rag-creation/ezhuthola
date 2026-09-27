@@ -519,8 +519,9 @@ private fun SmileHint(color: Color) {
 private val StripHeight = 52.dp
 
 /**
- * [typed Manglish]  [best Malayalam]  [other options…]
- * The best word is highlighted: it's what space will type. The Manglish chip types
+ * Malayalam: [typed Manglish]  [best Malayalam]  [other options…]
+ * English:   [typed word]  [completions…]
+ * The yellow chip is what space will type. In Malayalam mode the Manglish chip types
  * the English letters instead, so English words work without switching mode.
  */
 @Composable
@@ -536,9 +537,17 @@ private fun SuggestionStrip(suggestions: Suggestions?, onPick: (String) -> Unit)
     ) {
         if (suggestions == null || suggestions.typed.isEmpty()) return@Row
 
-        Chip(suggestions.typed, textColor = HintText, fontSize = 16) { onPick(suggestions.typed) }
-        suggestions.words.forEachIndexed { i, word ->
-            val isBest = i == 0
+        // Yellow chip = what space will type (best Malayalam word, or the English as typed).
+        val typedIsBest = suggestions.typed == suggestions.best
+        Chip(
+            text = suggestions.typed,
+            textColor = if (typedIsBest) Accent else HintText,
+            background = if (typedIsBest) Accent.copy(alpha = 0.18f) else Color.Transparent,
+            fontSize = if (typedIsBest) 20 else 16,
+            bold = typedIsBest
+        ) { onPick(suggestions.typed) }
+        suggestions.words.forEach { word ->
+            val isBest = word == suggestions.best
             Chip(
                 text = word,
                 textColor = if (isBest) Accent else KeyText,
