@@ -4,9 +4,13 @@ import android.view.ContextThemeWrapper
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +47,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rr.numio.ezhuthola.engine.Suggestions
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.emoji2.emojipicker.EmojiPickerView
 import kotlin.math.min
@@ -82,13 +87,16 @@ private val symbolRows = listOf(
 
 @Composable
 fun KeyboardLayout(
+    malayalam: Boolean,               // yellow ola key = Malayalam mode
+    onToggleLanguage: () -> Unit,
+    suggestions: Suggestions?,        // what the strip shows for the word being typed
+    onPick: (String) -> Unit,         // user tapped a word in the strip
     onText: (String) -> Unit,
     onBackspace: () -> Unit,
     onEnter: () -> Unit
 ) {
     var shift by remember { mutableStateOf(Shift.OFF) }
     var symbols by remember { mutableStateOf(false) }
-    var malayalam by remember { mutableStateOf(false) } // starts in English; the ola key turns yellow in Malayalam mode
     var emojiOpen by remember { mutableStateOf(false) }
 
     fun label(key: String) = if (!symbols && shift != Shift.OFF) key.uppercase() else key
@@ -115,6 +123,8 @@ fun KeyboardLayout(
             )
             return@Column
         }
+
+        SuggestionStrip(suggestions, onPick)
 
         // Row 1: letters, hold for numbers
         Row(Modifier.fillMaxWidth()) {
@@ -185,7 +195,7 @@ fun KeyboardLayout(
                 modifier = Modifier.weight(1.2f),
                 color = if (malayalam) Accent else SpecialKeyColor,
                 icon = { OlaIcon(onYellow = malayalam) }
-            ) { malayalam = !malayalam }
+            ) { onToggleLanguage() }
 
             Key(
                 label = if (malayalam) "മലയാളം" else "English",
@@ -390,7 +400,7 @@ private fun EmojiPanel(
     AndroidView(
         modifier = Modifier
             .fillMaxWidth()
-            .height(RowHeight * 3),
+            .height(RowHeight * 3 + StripHeight), // same height as the letter keyboard + strip
         factory = { context ->
             // Dark theme wrapper so the picker matches the keyboard.
             EmojiPickerView(ContextThemeWrapper(context, android.R.style.Theme_DeviceDefault)).apply {
@@ -499,5 +509,74 @@ private fun SmileHint(color: Color) {
         }, color, style = stroke)
         drawCircle(color, radius = 1.4f * u, center = Offset(9 * u, 9.5f * u))
         drawCircle(color, radius = 1.4f * u, center = Offset(15 * u, 9.5f * u))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Suggestion strip
+// ---------------------------------------------------------------------------
+
+private val StripHeight = 52.dp
+
+/**
+ * [typed Manglish]  [best Malayalam]  [other options…]
+ * The best word is highlighted: it's what space will type. The Manglish chip types
+ * the English letters instead, so English words work without switching mode.
+ */
+@Composable
+private fun SuggestionStrip(suggestions: Suggestions?, onPick: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(StripHeight)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        if (suggestions == null || suggestions.typed.isEmpty()) return@Row
+
+        Chip(suggestions.typed, textColor = HintText, fontSize = 16) { onPick(suggestions.typed) }
+        suggestions.words.forEachIndexed { i, word ->
+            val isBest = i == 0
+            Chip(
+                text = word,
+                textColor = if (isBest) Accent else KeyText,
+                background = if (isBest) Accent.copy(alpha = 0.18f) else Color.Transparent,
+                bold = isBest
+            ) { onPick(word) }
+        }
+    }
+}
+
+@Composable
+private fun Chip(
+    text: String,
+    textColor: Color,
+    background: Color = Color.Transparent,
+    fontSize: Int = 20,
+    bold: Boolean = false,
+    onClick: () -> Unit
+) {
+    val view = LocalView.current
+    Box(
+        modifier = Modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(background)
+            .clickable {
+                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                onClick()
+            }
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+            fontSize = fontSize.sp,
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1
+        )
     }
 }
