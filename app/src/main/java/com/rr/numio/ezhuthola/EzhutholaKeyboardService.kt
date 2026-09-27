@@ -3,9 +3,13 @@ package com.rr.numio.ezhuthola
 import android.annotation.SuppressLint
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -17,9 +21,18 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.rr.numio.ezhuthola.engine.MalayalamEngine
+import com.rr.numio.ezhuthola.engine.MalayalamRules
+import com.rr.numio.ezhuthola.engine.MalayalamSuggester
+import com.rr.numio.ezhuthola.engine.Suggestions
+import com.rr.numio.ezhuthola.engine.WordFrequencies
 
 /**
  * The keyboard itself. Android starts this service whenever Ezhuthola is the active keyboard.
+ *
+ * Malayalam mode: letters are collected into a Manglish word ("paranju"). While typing, the
+ * best Malayalam spelling is shown underlined in the app (composing text) and the strip shows
+ * options. Space, punctuation or enter commits the best word; tapping a chip commits that one.
  *
  * A service has no lifecycle of its own, but Compose needs one, so this class provides it
  * (LifecycleOwner + SavedStateRegistryOwner) and attaches it to the keyboard window.
@@ -33,10 +46,34 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateController.savedStateRegistry
 
+    // ---- Keyboard state (Compose redraws the keyboard when these change) ----
+
+    private var malayalam by mutableStateOf(false)
+    private var suggestions by mutableStateOf<Suggestions?>(null)
+
+    /** Manglish letters of the word being typed, e.g. "paran". Empty = not composing. */
+    private val word = StringBuilder()
+
+    /** Loaded in the background at start-up; null for the first moment. */
+    @Volatile private var suggester: MalayalamSuggester? = null
+
+    /** Password, email and web-address fields always get plain English. */
+    private var plainField = false
+
     override fun onCreate() {
         super.onCreate()
         savedStateController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+
+        Thread {
+            val rules = MalayalamRules.fromJson(
+                assets.open("ezhuthola_rules.json").bufferedReader().use { it.readText() }
+            )
+            val words = assets.open("ml_words.tsv").bufferedReader().useLines {
+                WordFrequencies.fromTsv(it)
+            }
+            suggester = MalayalamSuggester(MalayalamEngine(rules), words)
+        }.start()
     }
 
     override fun onCreateInputView(): View {
@@ -44,7 +81,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             setBackgroundColor(0xFF141414.toInt())
             setContent {
                 KeyboardLayout(
-                    onText = ::typeText,
+                    malayalam = malayalam,
+                    onToggleLanguage = ::toggleLanguage,
+                    suggestions = suggestions,
+                    onPick = ::pick,
+                    onText = ::onKeyText,
                     onBackspace = ::backspace,
                     onEnter = ::enter
                 )
@@ -77,26 +118,17 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         return keyboardView
     }
 
-    /** Height of the navigation bar Android draws over keyboards (Android 15 and newer). */
-    @SuppressLint("DiscouragedApi", "InternalInsetResource")
-    private fun imeNavigationBarHeight(): Int {
-        if (Build.VERSION.SDK_INT < 35) return 0 // older Android lays the keyboard out above it
-        val id = resources.getIdentifier("navigation_bar_frame_height", "dimen", "android")
-        return if (id != 0) {
-            resources.getDimensionPixelSize(id)
-        } else {
-            (48 * resources.displayMetrics.density).toInt() // safe fallback: 48dp
-        }
-    }
-
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        plainField = info?.let(::isPlainField) ?: false
+        resetWord()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+        commitWord()
     }
 
     override fun onDestroy() {
@@ -104,18 +136,66 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
     }
 
-    // ---- Sending text to the app the user is typing in ----
+    /** If the user taps somewhere else in the text, stop composing and keep what's there. */
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int,
+        newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        val cursorLeftTheWord = newSelStart != newSelEnd || candidatesStart < 0 || newSelEnd != candidatesEnd
+        if (word.isNotEmpty() && cursorLeftTheWord) {
+            currentInputConnection?.finishComposingText()
+            resetWord()
+        }
+    }
 
-    private fun typeText(text: String) {
-        currentInputConnection?.commitText(text, 1)
+    // ---- Keys --------------------------------------------------------------
+
+    private fun toggleLanguage() {
+        commitWord()
+        malayalam = !malayalam
+    }
+
+    private fun onKeyText(text: String) {
+        val composesMalayalam = malayalam && !plainField
+        when {
+            // A Manglish letter: add it to the word being typed.
+            composesMalayalam && text.length == 1 && text[0].isAsciiLetter() -> {
+                word.append(text)
+                refreshWord()
+            }
+            // Space: commit the best word, then the space.
+            text == " " -> {
+                commitWord()
+                commit(" ")
+            }
+            // Anything else (punctuation, numbers, emoji): finish the word first.
+            else -> {
+                commitWord()
+                commit(text)
+            }
+        }
     }
 
     private fun backspace() {
+        if (word.isNotEmpty()) {
+            word.deleteCharAt(word.lastIndex)
+            if (word.isEmpty()) {
+                currentInputConnection?.setComposingText("", 1)
+                currentInputConnection?.finishComposingText()
+                resetWord()
+            } else {
+                refreshWord()
+            }
+            return
+        }
         // A real key event handles selected text and emoji correctly.
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
     }
 
     private fun enter() {
+        commitWord()
         val ic = currentInputConnection ?: return
         val options = currentInputEditorInfo?.imeOptions ?: 0
         val action = options and EditorInfo.IME_MASK_ACTION
@@ -130,6 +210,75 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         } else {
             // Plain new line (e.g. WhatsApp message box).
             sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+        }
+    }
+
+    /** A word from the strip was tapped: type it plus a space. */
+    private fun pick(chosen: String) {
+        val ic = currentInputConnection ?: return
+        ic.setComposingText(chosen, 1)
+        ic.finishComposingText()
+        resetWord()
+        commit(" ")
+    }
+
+    // ---- Composing ---------------------------------------------------------
+
+    /** Show the best Malayalam for the letters so far, underlined, and update the strip. */
+    private fun refreshWord() {
+        val typed = word.toString()
+        val s = suggester?.suggest(typed)
+            ?: Suggestions(typed = typed, best = typed, words = emptyList()) // still loading
+        suggestions = s
+        currentInputConnection?.setComposingText(s.best, 1)
+    }
+
+    /** Make the underlined word permanent (space, punctuation, enter, switching mode). */
+    private fun commitWord() {
+        if (word.isEmpty()) return
+        currentInputConnection?.finishComposingText()
+        resetWord()
+    }
+
+    private fun resetWord() {
+        word.clear()
+        suggestions = null
+    }
+
+    private fun commit(text: String) {
+        currentInputConnection?.commitText(text, 1)
+    }
+
+    // ---- Helpers -----------------------------------------------------------
+
+    private fun Char.isAsciiLetter() = this in 'a'..'z' || this in 'A'..'Z'
+
+    private fun isPlainField(info: EditorInfo): Boolean {
+        val type = info.inputType
+        val variation = type and InputType.TYPE_MASK_VARIATION
+        return when (type and InputType.TYPE_MASK_CLASS) {
+            InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_PHONE, InputType.TYPE_CLASS_DATETIME -> true
+            InputType.TYPE_CLASS_TEXT -> variation in setOf(
+                InputType.TYPE_TEXT_VARIATION_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+                InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS,
+                InputType.TYPE_TEXT_VARIATION_URI
+            )
+            else -> false
+        }
+    }
+
+    /** Height of the navigation bar Android draws over keyboards (Android 15 and newer). */
+    @SuppressLint("DiscouragedApi", "InternalInsetResource")
+    private fun imeNavigationBarHeight(): Int {
+        if (Build.VERSION.SDK_INT < 35) return 0 // older Android lays the keyboard out above it
+        val id = resources.getIdentifier("navigation_bar_frame_height", "dimen", "android")
+        return if (id != 0) {
+            resources.getDimensionPixelSize(id)
+        } else {
+            (48 * resources.displayMetrics.density).toInt() // safe fallback: 48dp
         }
     }
 }

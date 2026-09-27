@@ -334,9 +334,16 @@ private fun PrivacyCard() {
 @Composable
 private fun Footer() {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("v0.1 · Free & open source (GPL-3.0)", color = TextDim, fontSize = 12.sp)
+        Text("v0.2 · Free & open source (GPL-3.0)", color = TextDim, fontSize = 12.sp)
         Spacer(Modifier.height(4.dp))
         Text("Made by a Keralite 💛", color = TextDim, fontSize = 12.sp)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Malayalam word data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles",
+            color = TextDim.copy(alpha = 0.7f),
+            fontSize = 11.sp,
+            lineHeight = 15.sp
+        )
     }
 }
 
