@@ -318,7 +318,10 @@ private fun Key(
  * Malayalam mode (yellow key): leaves in dark ink so they stand out on yellow.
  */
 @Composable
-private fun OlaIcon(onYellow: Boolean) {
+internal fun OlaIcon(
+    onYellow: Boolean,
+    modifier: Modifier = Modifier.size(width = 36.dp, height = 31.dp)
+) {
     val cover = Color(0xFF54595F)
     val leaves = if (onYellow) {
         listOf(0x5E2A1C08L, 0x802A1C08L, 0xA62A1C08L, 0xCC2A1C08L).map { Color(it) }
@@ -329,7 +332,7 @@ private fun OlaIcon(onYellow: Boolean) {
     val hole = if (onYellow) Accent else SpecialKeyColor
     val string = if (onYellow) Color(0xFFB0303D) else Color(0xFFC83E4D)
 
-    Canvas(Modifier.size(width = 36.dp, height = 31.dp)) {
+    Canvas(modifier) {
         // The logo's shapes live in a 206 × 200 box (same coordinates as the icon artwork).
         val minX = 90f; val minY = 58f; val boxW = 206f; val boxH = 200f
         val s = min(size.width / boxW, size.height / boxH)
