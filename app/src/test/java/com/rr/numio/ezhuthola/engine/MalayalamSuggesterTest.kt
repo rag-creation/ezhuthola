@@ -26,6 +26,12 @@ class MalayalamSuggesterTest {
         assertEquals("നാളെ", best("nale"))       // needs two changes: a→ാ and ല→ള
     }
 
+    @Test fun looseMatchingFindsRealWords() {
+        assertEquals("വിശേഷങ്ങൾ", best("visheshangal")) // 3 changes: െ→േ, ശ→ഷ, ൽ→ൾ
+        assertEquals("സുഖമാണോ", best("sukamano"))       // k→ഖ, a→ാ, ന→ണ, o→ോ
+        assertEquals("സുഖമല്ലേ", best("sukhamalle"))
+    }
+
     @Test fun unknownWordsStillWork() {
         // A name that isn't in the word list: the engine's own spelling is used.
         assertEquals("രാഗെശ്", best("raagesh"))
