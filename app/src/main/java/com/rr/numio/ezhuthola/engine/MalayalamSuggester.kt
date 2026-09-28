@@ -46,11 +46,13 @@ data class Suggestions(
  * 2. Loose matching finds real words that differ only in letters Manglish can't tell apart
  *    (ന/ണ, ല/ള, ശ/ഷ/സ, ട/ത, short/long vowels, k/kh…): "visheshangal" → വിശേഷങ്ങൾ.
  * 3. Everything is ranked by how common it is. Spellings nobody uses keep the engine's order.
+ * 4. Words this person picked before ([userWords]) come first, most-picked first.
  */
 class MalayalamSuggester(
     private val engine: MalayalamEngine,
     private val frequencies: WordFrequencies,
     private val maxShown: Int = 5,
+    private val userWords: UserWords = UserWords(),
 ) {
     /** Loose key → real words with that key, most common first (max 4 each). */
     private val looseIndex: Map<String, List<String>> = buildMap<String, MutableList<String>> {
@@ -69,10 +71,19 @@ class MalayalamSuggester(
             looseIndex[key]?.let(pool::addAll)
         }
 
-        // sortedByDescending is stable: equally-common words keep the engine's order.
-        val ranked = pool.sortedByDescending { frequencies.of(it) }.take(maxShown)
+        // Sorting is stable: equally-common words keep the engine's order.
+        val ranked = pool.sortedWith(
+            compareByDescending<String> { userWords.count(it) }.thenByDescending { frequencies.of(it) }
+        ).take(maxShown)
         return Suggestions(typed = typed, best = ranked.first(), words = ranked)
     }
+
+    /**
+     * How often the best Malayalam reading of [typed] is used ("poda" → പോടാ: common).
+     * English mode uses this to leave Manglish alone instead of "correcting" it.
+     */
+    fun commonness(typed: String): Int =
+        if (typed.isEmpty()) 0 else frequencies.of(suggest(typed).best)
 
     companion object {
         /** Letters Manglish can't tell apart are folded together. */
