@@ -1,6 +1,15 @@
 package com.rr.numio.ezhuthola
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.media.AudioManager
 import android.view.ContextThemeWrapper
+import android.view.View
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -70,13 +79,23 @@ private const val LongPressMs = 350L   // hold a top-row key this long to type i
 private const val RepeatStartMs = 400L // hold backspace this long before it repeats
 private const val RepeatEveryMs = 50L
 
-// ---- Numio dark palette ----
-private val KeyboardBg = Color(0xFF141414)
-private val KeyColor = Color(0xFF2A2A2A)
-private val SpecialKeyColor = Color(0xFF1D1D1D)
-private val KeyText = Color(0xFFF2F2F2)
-private val HintText = Color(0xFF9E9E9E)
-private val Accent = Color(0xFFF5C427)
+// ---- Colours: they come from the chosen theme (see KeyboardTheme.kt) ----
+private val KeyboardBg: Color @Composable get() = LocalKeyboardTheme.current.background
+private val KeyColor: Color @Composable get() = LocalKeyboardTheme.current.key
+private val SpecialKeyColor: Color @Composable get() = LocalKeyboardTheme.current.specialKey
+private val KeyText: Color @Composable get() = LocalKeyboardTheme.current.keyText
+private val HintText: Color @Composable get() = LocalKeyboardTheme.current.hint
+private val Accent: Color @Composable get() = LocalKeyboardTheme.current.accent
+private val CardColor: Color @Composable get() = LocalKeyboardTheme.current.card
+
+/** Key-press feedback: vibration and/or click sound, as set in the app. */
+private fun View.keyTap(feedback: KeyFeedback) {
+    if (feedback.vibrate) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+    if (feedback.sound) {
+        (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
+            ?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, -1f)
+    }
+}
 
 private enum class Shift { OFF, ONCE, LOCKED }
 
@@ -117,7 +136,57 @@ fun KeyboardLayout(
     onPasteClip: (String) -> Unit,
     onTogglePin: (String) -> Unit,
     onDeleteClip: (String) -> Unit,
-    onClearClips: () -> Unit
+    onClearClips: () -> Unit,
+    onOpenSettings: () -> Unit,       // gear in the strip
+    onSwitchKeyboard: () -> Unit,     // hold space: Android's keyboard picker
+    theme: KeyboardTheme,
+    photo: Bitmap?,                   // background for the "Your photo" theme
+    photoDim: Float,                  // 0 = photo as-is, 1 = black
+    feedback: KeyFeedback
+) {
+    CompositionLocalProvider(LocalKeyboardTheme provides theme, LocalKeyFeedback provides feedback) {
+        Box(Modifier.fillMaxWidth()) {
+            if (theme.usesPhoto && photo != null) {
+                // The photo fills the keyboard, darkened so the letters stay readable.
+                val image = remember(photo) { photo.asImageBitmap() }
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = photoDim)))
+            }
+            KeyboardContent(
+                malayalam, onToggleLanguage, suggestions, onPick, onText, onBackspace, onEnter,
+                session, startWithNumbers, clips, onOpenClipboard, onPasteClip, onTogglePin,
+                onDeleteClip, onClearClips, onOpenSettings, onSwitchKeyboard,
+                transparent = theme.usesPhoto && photo != null
+            )
+        }
+    }
+}
+
+@Composable
+private fun KeyboardContent(
+    malayalam: Boolean,
+    onToggleLanguage: () -> Unit,
+    suggestions: Suggestions?,
+    onPick: (String) -> Unit,
+    onText: (String) -> Unit,
+    onBackspace: () -> Unit,
+    onEnter: () -> Unit,
+    session: Int,
+    startWithNumbers: Boolean,
+    clips: List<Clip>,
+    onOpenClipboard: () -> Unit,
+    onPasteClip: (String) -> Unit,
+    onTogglePin: (String) -> Unit,
+    onDeleteClip: (String) -> Unit,
+    onClearClips: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onSwitchKeyboard: () -> Unit,
+    transparent: Boolean
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -143,7 +212,7 @@ fun KeyboardLayout(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(KeyboardBg)
+            .background(if (transparent) Color.Transparent else KeyboardBg)
             .padding(horizontal = 2.dp, vertical = 4.dp)
     ) {
         if (emojiOpen) {
@@ -171,7 +240,10 @@ fun KeyboardLayout(
 
         if (suggestions == null || suggestions.typed.isEmpty()) {
             // Not typing a word: show the clipboard button.
-            IdleStrip(onOpenClipboard = { onOpenClipboard(); clipboardOpen = true })
+            IdleStrip(
+                onOpenSettings = onOpenSettings,
+                onOpenClipboard = { onOpenClipboard(); clipboardOpen = true }
+            )
         } else {
             SuggestionStrip(suggestions, onPick)
         }
@@ -259,7 +331,8 @@ fun KeyboardLayout(
                 label = if (malayalam) "മലയാളം" else "English",
                 modifier = Modifier.weight(4f),
                 textColor = HintText,
-                fontSize = 16
+                fontSize = 16,
+                onLongPress = onSwitchKeyboard     // hold space → choose another keyboard
             ) { onText(" ") }
             Key(".", Modifier.weight(1f), color = SpecialKeyColor) { onText(".") }
             Key(
@@ -291,6 +364,7 @@ private fun Key(
     onPress: () -> Unit
 ) {
     val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
     var pressed by remember { mutableStateOf(false) }
     val press by rememberUpdatedState(onPress)
     val longPress by rememberUpdatedState(onLongPress)
@@ -298,11 +372,11 @@ private fun Key(
     Box(
         modifier = modifier
             .height(RowHeight)
-            .pointerInput(repeat) {
+            .pointerInput(repeat, feedback) {
                 awaitEachGesture {
                     awaitFirstDown()
                     pressed = true
-                    view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    view.keyTap(feedback)
                     try {
                         if (repeat) {
                             // Backspace: delete now, then keep deleting while held.
@@ -325,7 +399,7 @@ private fun Key(
                                     true -> press()
                                     false -> Unit
                                     null -> {
-                                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                        if (feedback.vibrate) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                                         onLong()
                                         waitForUpOrCancellation()
                                     }
@@ -391,13 +465,15 @@ internal fun OlaIcon(
     modifier: Modifier = Modifier.size(width = 36.dp, height = 31.dp)
 ) {
     val cover = Color(0xFF54595F)
+    // On the accent-coloured key the leaves are drawn in the theme's "ink" colour.
+    val ink = LocalKeyboardTheme.current.inkOnAccent
     val leaves = if (onYellow) {
-        listOf(0x5E2A1C08L, 0x802A1C08L, 0xA62A1C08L, 0xCC2A1C08L).map { Color(it) }
+        listOf(0.37f, 0.5f, 0.65f, 0.8f).map { ink.copy(alpha = it) }
     } else {
         listOf(0xFF9C6B26, 0xFFB07A2C, 0xFFC48A33, 0xFFD6993A).map { Color(it) }
     }
-    val front = if (onYellow) Color(0xFF2A1C08) else Color(0xFFF0A53A)
-    val hole = if (onYellow) Accent else SpecialKeyColor
+    val front = if (onYellow) ink else Color(0xFFF0A53A)
+    val hole = if (onYellow) Accent else LocalKeyboardTheme.current.specialKey
     val string = if (onYellow) Color(0xFFB0303D) else Color(0xFFC83E4D)
 
     Canvas(modifier) {
@@ -455,15 +531,19 @@ private fun EmojiPanel(
     onSpace: () -> Unit,
     onClose: () -> Unit
 ) {
+    val theme = LocalKeyboardTheme.current
+    val light = theme.id == Themes.Light.id
+    val emojiTheme = if (light) android.R.style.Theme_DeviceDefault_Light else android.R.style.Theme_DeviceDefault
+    val emojiBg = if (theme.usesPhoto) android.graphics.Color.TRANSPARENT else theme.background.toArgb()
     AndroidView(
         modifier = Modifier
             .fillMaxWidth()
             .height(RowHeight * 3 + StripHeight), // same height as the letter keyboard + strip
         factory = { context ->
             // Dark theme wrapper so the picker matches the keyboard.
-            EmojiPickerView(ContextThemeWrapper(context, android.R.style.Theme_DeviceDefault)).apply {
+            EmojiPickerView(ContextThemeWrapper(context, emojiTheme)).apply {
                 emojiGridColumns = 8
-                setBackgroundColor(0xFF141414.toInt())
+                setBackgroundColor(emojiBg)
                 setOnEmojiPickedListener { item -> onEmoji(item.emoji) }
             }
         }
@@ -626,13 +706,14 @@ private fun Chip(
     onClick: () -> Unit
 ) {
     val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
     Box(
         modifier = Modifier
             .height(42.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(background)
             .clickable {
-                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                view.keyTap(feedback)
                 onClick()
             }
             .padding(horizontal = 14.dp),
@@ -652,10 +733,9 @@ private fun Chip(
 // Clipboard
 // ---------------------------------------------------------------------------
 
-/** Strip when no word is being typed: just the clipboard button on the right. */
+/** Strip when no word is being typed: settings gear on the left, clipboard on the right. */
 @Composable
-private fun IdleStrip(onOpenClipboard: () -> Unit) {
-    val view = LocalView.current
+private fun IdleStrip(onOpenSettings: () -> Unit, onOpenClipboard: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -663,17 +743,40 @@ private fun IdleStrip(onOpenClipboard: () -> Unit) {
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        StripButton(onOpenSettings) { SettingsIcon(HintText, Modifier.size(24.dp)) }
         Spacer(Modifier.weight(1f))
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .clickable {
-                    view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                    onOpenClipboard()
-                },
-            contentAlignment = Alignment.Center
-        ) { ClipboardIcon(HintText, Modifier.size(24.dp)) }
+        StripButton(onOpenClipboard) { ClipboardIcon(HintText, Modifier.size(24.dp)) }
+    }
+}
+
+@Composable
+private fun StripButton(onClick: () -> Unit, icon: @Composable () -> Unit) {
+    val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable {
+                view.keyTap(feedback)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) { icon() }
+}
+
+/** Two slider lines: "settings". */
+@Composable
+private fun SettingsIcon(color: Color, modifier: Modifier) {
+    Canvas(modifier) {
+        val u = size.width / 24f
+        val w = 1.8f * u
+        drawLine(color, Offset(4 * u, 7 * u), Offset(14 * u, 7 * u), w, StrokeCap.Round)
+        drawLine(color, Offset(18 * u, 7 * u), Offset(20 * u, 7 * u), w, StrokeCap.Round)
+        drawLine(color, Offset(4 * u, 17 * u), Offset(8 * u, 17 * u), w, StrokeCap.Round)
+        drawLine(color, Offset(12 * u, 17 * u), Offset(20 * u, 17 * u), w, StrokeCap.Round)
+        drawCircle(color, 2 * u, Offset(16 * u, 7 * u), style = Stroke(w))
+        drawCircle(color, 2 * u, Offset(10 * u, 17 * u), style = Stroke(w))
     }
 }
 
@@ -780,6 +883,7 @@ private fun ClipboardPanel(
 @Composable
 private fun ClipCard(clip: Clip, isSelected: Boolean, onTap: () -> Unit, onHold: () -> Unit) {
     val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
     val tap by rememberUpdatedState(onTap)
     val hold by rememberUpdatedState(onHold)
     Box(
@@ -787,16 +891,16 @@ private fun ClipCard(clip: Clip, isSelected: Boolean, onTap: () -> Unit, onHold:
             .fillMaxWidth()
             .height(68.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) Accent.copy(alpha = 0.18f) else Color(0xFF1E1E1E))
-            .border(1.dp, if (isSelected) Accent else Color(0xFF2A2A2A), RoundedCornerShape(12.dp))
+            .background(if (isSelected) Accent.copy(alpha = 0.18f) else CardColor)
+            .border(1.dp, if (isSelected) Accent else KeyColor, RoundedCornerShape(12.dp))
             .pointerInput(clip.text) {
                 detectTapGestures(
                     onTap = {
-                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        view.keyTap(feedback)
                         tap()
                     },
                     onLongPress = {
-                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        if (feedback.vibrate) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                         hold()
                     }
                 )
@@ -821,12 +925,13 @@ private fun ClipCard(clip: Clip, isSelected: Boolean, onTap: () -> Unit, onHold:
 @Composable
 private fun HeaderButton(text: String, onClick: () -> Unit) {
     val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
     Box(
         modifier = Modifier
             .height(40.dp)
             .clip(RoundedCornerShape(10.dp))
             .clickable {
-                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                view.keyTap(feedback)
                 onClick()
             }
             .padding(horizontal = 10.dp),
