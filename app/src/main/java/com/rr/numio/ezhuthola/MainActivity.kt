@@ -177,6 +177,9 @@ fun SetupScreen(
         )
 
         Spacer(Modifier.height(10.dp))
+        KeyboardSettingsSections()   // Typing + Keyboard look (SettingsSections.kt)
+
+        Spacer(Modifier.height(10.dp))
         SectionLabel("PRIVACY")
         PrivacyCard()
 

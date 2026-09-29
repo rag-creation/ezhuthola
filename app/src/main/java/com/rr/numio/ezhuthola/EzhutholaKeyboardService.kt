@@ -2,6 +2,9 @@ package com.rr.numio.ezhuthola
 
 import android.annotation.SuppressLint
 import android.content.ClipboardManager
+import android.content.Intent
+import android.graphics.Bitmap
+import android.view.inputmethod.InputMethodManager
 import android.os.Handler
 import android.os.Looper
 import android.inputmethodservice.InputMethodService
@@ -15,7 +18,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -89,8 +94,16 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     /** Password fields: never save what's copied while typing there. */
     private var passwordField = false
 
-    /** Small settings, like the last language mode. */
-    private val prefs by lazy { getSharedPreferences("ezhuthola", MODE_PRIVATE) }
+    /** Small settings, like the last language mode. Changed in the app screen. */
+    private val prefs by lazy { KeyboardSettings.prefs(this) }
+
+    // ---- Look & feel (read from settings each time the keyboard opens) ----
+    private var theme by mutableStateOf(Themes.Numio)
+    private var photo by mutableStateOf<Bitmap?>(null)
+    private var photoStamp = 0L      // when the loaded photo file was saved
+    private var photoDim by mutableStateOf(0.45f)
+    private var feedback by mutableStateOf(KeyFeedback())
+    private var keyboardRoot: View? = null
 
     /** Password, email and web-address fields always get plain English. */
     private var plainField = false
@@ -99,7 +112,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         super.onCreate()
         savedStateController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
-        malayalam = prefs.getBoolean("malayalam", false) // open in the mode you left it
+        malayalam = prefs.getBoolean(KeyboardSettings.MALAYALAM, false) // open in the mode you left it
         clipboard.addPrimaryClipChangedListener(clipListener)
 
         Thread {
@@ -147,7 +160,15 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     onPasteClip = ::pasteClip,
                     onTogglePin = { history.togglePin(it); clips = history.all(now()); saveClips() },
                     onDeleteClip = { history.delete(it); clips = history.all(now()); saveClips() },
-                    onClearClips = { history.clearUnpinned(); clips = history.all(now()) }
+                    onClearClips = { history.clearUnpinned(); clips = history.all(now()) },
+                    onOpenSettings = ::openSettings,
+                    onSwitchKeyboard = {
+                        getSystemService(InputMethodManager::class.java).showInputMethodPicker()
+                    },
+                    theme = theme,
+                    photo = photo,
+                    photoDim = photoDim,
+                    feedback = feedback
                 )
             }
         }
@@ -175,6 +196,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             ViewCompat.requestApplyInsets(root)
         }
 
+        keyboardRoot = keyboardView
+        applySettings()
         return keyboardView
     }
 
@@ -186,6 +209,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         passwordField = info?.let(::isPasswordField) ?: false
         // `restarting` = same field, the app just refreshed it: keep the current page.
         if (!restarting) session++
+        applySettings()
         undo = null
         resetWord()
     }
@@ -226,7 +250,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private fun toggleLanguage() {
         undo = null
         malayalam = !malayalam
-        prefs.edit().putBoolean("malayalam", malayalam).apply()
+        prefs.edit().putBoolean(KeyboardSettings.MALAYALAM, malayalam).apply()
         if (word.isNotEmpty() && !plainField) refreshWord()
     }
 
@@ -345,11 +369,56 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         return true
     }
 
+    // ---- Settings -------------------------------------------------------------
+
+    /** Picks up anything changed in the app screen: theme, photo, vibration, sound, clipboard. */
+    private fun applySettings() {
+        theme = Themes.byId(prefs.getString(KeyboardSettings.THEME, Themes.Numio.id))
+        photoDim = prefs.getFloat(KeyboardSettings.PHOTO_DIM, 0.45f)
+        feedback = KeyFeedback(
+            vibrate = prefs.getBoolean(KeyboardSettings.VIBRATE, true),
+            sound = prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)
+        )
+        if (!prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)) {
+            history.clearUnpinned()
+            clips = history.all(now())
+        }
+        // Load the photo only when the photo theme is on, and again only if it changed.
+        val file = KeyboardSettings.photoFile(this)
+        if (theme.usesPhoto && file.exists()) {
+            if (photo == null || file.lastModified() != photoStamp) {
+                photoStamp = file.lastModified()
+                Thread {
+                    val bitmap = KeyboardSettings.loadPhoto(this)
+                    mainHandler.post { photo = bitmap }
+                }.start()
+            }
+        } else {
+            photo = null
+        }
+        // The strip under the keys (behind Android's navigation bar) matches the theme,
+        // and the ∨ / gesture bar turns dark on the Light theme so it stays visible.
+        keyboardRoot?.setBackgroundColor(theme.background.toArgb())
+        window?.window?.let { w ->
+            WindowCompat.getInsetsController(w, w.decorView).isAppearanceLightNavigationBars =
+                theme.id == Themes.Light.id
+        }
+    }
+
+    /** Gear in the strip: open the Ezhuthola app screen. */
+    private fun openSettings() {
+        commitWord()
+        requestHideSelf(0)
+        startActivity(
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+
     // ---- Clipboard ------------------------------------------------------------
 
     /** Something was copied. Save it, unless it's a password, an OTP, or history is off. */
     private fun onCopied() {
-        if (!prefs.getBoolean("clipboard_history", true) || passwordField) return
+        if (!prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true) || passwordField) return
         val clip = try { clipboard.primaryClip } catch (e: SecurityException) { null } ?: return
         // Password managers and OTP autofill mark their copies as sensitive (Android 13+).
         if (clip.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE") == true) return
