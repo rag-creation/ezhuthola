@@ -46,7 +46,9 @@ data class Suggestions(
  * 2. Loose matching finds real words that differ only in letters Manglish can't tell apart
  *    (ന/ണ, ല/ള, ശ/ഷ/സ, ട/ത, short/long vowels, k/kh…): "visheshangal" → വിശേഷങ്ങൾ.
  * 3. Everything is ranked by how common it is. Spellings nobody uses keep the engine's order.
- * 4. Words this person picked before ([userWords]) come first, most-picked first.
+ * 4. Words the list doesn't have are built from a real base word + ending ([SuffixSplitter]):
+ *    "achanodu" → അച്ഛൻ + ോട് → അച്ഛനോട്.
+ * 5. Words this person picked before ([userWords]) come first, most-picked first.
  */
 class MalayalamSuggester(
     private val engine: MalayalamEngine,
@@ -62,20 +64,35 @@ class MalayalamSuggester(
         }
     }
 
+    /** Base word + ending, for forms the word list doesn't have ("keralathil" → കേരളത്തിൽ). */
+    private val splitter = SuffixSplitter(realWords = { manglish ->
+        pool(manglish).map { it to frequencies.of(it) }.filter { it.second > 0 }.sortedByDescending { it.second }
+    })
+
     fun suggest(typed: String): Suggestions {
         if (typed.isEmpty()) return Suggestions("", "", emptyList())
-        val engineWords = engine.transliterate(typed).candidates
+        val pool = pool(typed)
 
+        // Forms built from a real base word count as a bit less common than the base.
+        val built = splitter.split(typed)
+        pool += built.keys
+        fun score(word: String) = maxOf(frequencies.of(word), built[word] ?: 0)
+
+        // Sorting is stable: equally-common words keep the engine's order.
+        val ranked = pool.sortedWith(
+            compareByDescending<String> { userWords.count(it) }.thenByDescending(::score)
+        ).take(maxShown)
+        return Suggestions(typed = typed, best = ranked.first(), words = ranked)
+    }
+
+    /** What the engine reads [typed] as, plus real words that differ only in loose letters. */
+    private fun pool(typed: String): LinkedHashSet<String> {
+        val engineWords = engine.transliterate(typed).candidates
         val pool = LinkedHashSet<String>(engineWords)
         engineWords.asSequence().map(::looseKey).distinct().forEach { key ->
             looseIndex[key]?.let(pool::addAll)
         }
-
-        // Sorting is stable: equally-common words keep the engine's order.
-        val ranked = pool.sortedWith(
-            compareByDescending<String> { userWords.count(it) }.thenByDescending { frequencies.of(it) }
-        ).take(maxShown)
-        return Suggestions(typed = typed, best = ranked.first(), words = ranked)
+        return pool
     }
 
     /**
@@ -103,8 +120,15 @@ class MalayalamSuggester(
             put('ൻ', "ന്"); put('ൺ', "ന്"); put('ർ', "ര്"); put('ൽ', "ല്"); put('ൾ', "ല്"); put('ം', "മ്")
         }
 
-        fun looseKey(word: String): String = buildString(word.length) {
-            for (c in word) append(fold[c] ?: c)
+        /** Manglish "ch" is usually written double: ചേച്ചി (chechi), അച്ഛൻ (achan). */
+        private val foldPairs = listOf("ച്ഛ" to "ച", "ച്ച" to "ച")
+
+        fun looseKey(word: String): String {
+            var w = word
+            for ((from, to) in foldPairs) if (from in w) w = w.replace(from, to)
+            return buildString(w.length) {
+                for (c in w) append(fold[c] ?: c)
+            }
         }
     }
 }
