@@ -64,6 +64,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
@@ -139,6 +142,7 @@ fun KeyboardLayout(
     onClearClips: () -> Unit,
     onOpenSettings: () -> Unit,       // gear in the strip
     onSwitchKeyboard: () -> Unit,     // hold space: Android's keyboard picker
+    searchEmoji: (String) -> EmojiResults,
     theme: KeyboardTheme,
     photo: Bitmap?,                   // background for the "Your photo" theme
     photoDim: Float,                  // 0 = photo as-is, 1 = black
@@ -160,7 +164,7 @@ fun KeyboardLayout(
             KeyboardContent(
                 malayalam, onToggleLanguage, suggestions, onPick, onText, onBackspace, onEnter,
                 session, startWithNumbers, clips, onOpenClipboard, onPasteClip, onTogglePin,
-                onDeleteClip, onClearClips, onOpenSettings, onSwitchKeyboard,
+                onDeleteClip, onClearClips, onOpenSettings, onSwitchKeyboard, searchEmoji,
                 transparent = theme.usesPhoto && photo != null
             )
         }
@@ -186,6 +190,7 @@ private fun KeyboardContent(
     onClearClips: () -> Unit,
     onOpenSettings: () -> Unit,
     onSwitchKeyboard: () -> Unit,
+    searchEmoji: (String) -> EmojiResults,
     transparent: Boolean
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
@@ -220,7 +225,8 @@ private fun KeyboardContent(
                 onEmoji = onText,
                 onBackspace = onBackspace,
                 onSpace = { onText(" ") },
-                onClose = { emojiOpen = false }
+                onClose = { emojiOpen = false },
+                searchEmoji = searchEmoji
             )
             return@Column
         }
@@ -520,25 +526,41 @@ internal fun OlaIcon(
 // Emoji panel
 // ---------------------------------------------------------------------------
 
+/** What emoji search found, and how the Manglish was read ("chiri" → ചിരി), if it was. */
+data class EmojiResults(val emojis: List<String>, val reading: String? = null)
+
 /**
  * Full emoji panel: Google's open-source EmojiPickerView (categories, recents, skin tones),
  * drawn with the phone's own emoji font. Offline, no stickers/GIFs.
+ *
+ * A search bar sits on top. Tapping it swaps the emoji grid for letter keys: what you type
+ * there goes into the search, not into the app. Search understands English ("love"),
+ * Manglish ("chiri") and Malayalam keywords, from Unicode CLDR.
  */
 @Composable
 private fun EmojiPanel(
     onEmoji: (String) -> Unit,
     onBackspace: () -> Unit,
     onSpace: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    searchEmoji: (String) -> EmojiResults,
 ) {
+    var searching by remember { mutableStateOf(false) }
+    if (searching) {
+        EmojiSearchPanel(onEmoji, searchEmoji, onBack = { searching = false })
+        return
+    }
+
     val theme = LocalKeyboardTheme.current
     val light = theme.id == Themes.Light.id
     val emojiTheme = if (light) android.R.style.Theme_DeviceDefault_Light else android.R.style.Theme_DeviceDefault
     val emojiBg = if (theme.usesPhoto) android.graphics.Color.TRANSPARENT else theme.background.toArgb()
+
+    SearchBar(query = "", reading = null) { searching = true }
     AndroidView(
         modifier = Modifier
             .fillMaxWidth()
-            .height(RowHeight * 3 + StripHeight), // same height as the letter keyboard + strip
+            .height(RowHeight * 3), // search bar + grid = same height as the strip + letter keys
         factory = { context ->
             // Dark theme wrapper so the picker matches the keyboard.
             EmojiPickerView(ContextThemeWrapper(context, emojiTheme)).apply {
@@ -564,6 +586,193 @@ private fun EmojiPanel(
             repeat = true,
             icon = { BackspaceIcon(KeyText) }
         ) { onBackspace() }
+    }
+}
+
+/**
+ * Searching: results on top, letter keys below. Same height as the normal keyboard.
+ * Tapping a result types it into the app and keeps the search open, so you can add more.
+ */
+@Composable
+private fun EmojiSearchPanel(
+    onEmoji: (String) -> Unit,
+    searchEmoji: (String) -> EmojiResults,
+    onBack: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    val results = remember(query) { if (query.isBlank()) EmojiResults(emptyList()) else searchEmoji(query) }
+
+    // Strip: [search box] [results →]
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(StripHeight)
+            .padding(start = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.widthIn(max = 150.dp)) {
+            SearchBar(query = query, reading = results.reading, fill = false) { }
+        }
+        Spacer(Modifier.width(6.dp))
+        when {
+            query.isBlank() -> Text(
+                text = "love · chiri · kollam",
+                color = HintText,
+                fontSize = 14.sp,
+                maxLines = 1
+            )
+            results.emojis.isEmpty() -> Text(
+                text = "No emoji found",
+                color = HintText,
+                fontSize = 14.sp,
+                maxLines = 1
+            )
+            else -> LazyRow(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(results.emojis) { emoji ->
+                    EmojiResult(emoji) { onEmoji(emoji) }
+                }
+            }
+        }
+    }
+
+    fun type(letter: String) {
+        if (query.length < 30) query += letter
+    }
+
+    Row(Modifier.fillMaxWidth()) {
+        letterRows[0].forEach { k -> Key(k, Modifier.weight(1f)) { type(k) } }
+    }
+    Row(Modifier.fillMaxWidth()) {
+        Spacer(Modifier.weight(0.5f))
+        letterRows[1].forEach { k -> Key(k, Modifier.weight(1f)) { type(k) } }
+        Spacer(Modifier.weight(0.5f))
+    }
+    Row(Modifier.fillMaxWidth()) {
+        // Clear: empty the search box in one tap.
+        Key(
+            label = "Clear",
+            modifier = Modifier.weight(1.5f),
+            color = SpecialKeyColor,
+            fontSize = 14
+        ) { query = "" }
+        letterRows[2].forEach { k -> Key(k, Modifier.weight(1f)) { type(k) } }
+        Key(
+            label = "",
+            modifier = Modifier.weight(1.5f),
+            color = SpecialKeyColor,
+            repeat = true,
+            icon = { BackspaceIcon(KeyText) }
+        ) { query = query.dropLast(1) }
+    }
+    Row(Modifier.fillMaxWidth()) {
+        // Back to the emoji grid
+        Key(
+            label = "",
+            modifier = Modifier.weight(1.5f),
+            color = SpecialKeyColor,
+            icon = { SmileIcon(Accent, Modifier.size(24.dp)) }
+        ) { onBack() }
+        Key("space", Modifier.weight(5f), textColor = HintText, fontSize = 16) {
+            if (query.isNotEmpty() && !query.endsWith(" ")) query += " "
+        }
+        Key(
+            label = "",
+            modifier = Modifier.weight(1.5f),
+            color = SpecialKeyColor,
+            icon = { SearchIcon(KeyText, Modifier.size(24.dp)) }
+        ) {
+            // Search key: type the best result, like pressing enter in a search box.
+            results.emojis.firstOrNull()?.let(onEmoji)
+        }
+    }
+}
+
+/**
+ * Rounded search box. Empty: "Search emoji". Typing: the query, with the Malayalam
+ * the Manglish was read as underneath ("chiri" / ചിരി) so you can see it was understood.
+ */
+@Composable
+private fun SearchBar(query: String, reading: String?, fill: Boolean = true, onClick: () -> Unit) {
+    val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
+    Box(
+        modifier = Modifier
+            .then(if (fill) Modifier.fillMaxWidth().padding(horizontal = 6.dp) else Modifier)
+            .height(StripHeight),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Row(
+            modifier = Modifier
+                .then(if (fill) Modifier.fillMaxWidth() else Modifier)
+                .height(40.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(CardColor)
+                .border(1.dp, if (query.isEmpty() && fill) KeyColor else Accent, RoundedCornerShape(20.dp))
+                .clickable {
+                    view.keyTap(feedback)
+                    onClick()
+                }
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SearchIcon(if (query.isEmpty()) HintText else Accent, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            if (query.isEmpty()) {
+                Text("Search emoji", color = HintText, fontSize = 15.sp, maxLines = 1)
+            } else {
+                Column {
+                    Text(
+                        text = query + "|",
+                        color = KeyText,
+                        fontSize = 15.sp,
+                        lineHeight = 17.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (reading != null && reading != query) {
+                        Text(
+                            text = reading,
+                            color = Accent,
+                            fontSize = 11.sp,
+                            lineHeight = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmojiResult(emoji: String, onClick: () -> Unit) {
+    val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
+    Box(
+        modifier = Modifier
+            .size(46.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable {
+                view.keyTap(feedback)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(emoji, fontSize = 28.sp, maxLines = 1)
+    }
+}
+
+/** Magnifying glass. */
+@Composable
+private fun SearchIcon(color: Color, modifier: Modifier) {
+    Canvas(modifier) {
+        val u = size.width / 24f
+        drawCircle(color, 6.5f * u, Offset(10.5f * u, 10.5f * u), style = Stroke(2f * u))
+        drawLine(color, Offset(15.5f * u, 15.5f * u), Offset(20.5f * u, 20.5f * u), 2.2f * u, StrokeCap.Round)
     }
 }
 
@@ -636,8 +845,12 @@ private fun EnterIcon(color: Color) {
 
 /** Small outline smiley shown on the comma key: "hold for emoji". Same grey as the number hints. */
 @Composable
-private fun SmileHint(color: Color) {
-    Canvas(Modifier.size(17.dp)) {
+private fun SmileHint(color: Color) = SmileIcon(color, Modifier.size(17.dp))
+
+/** Outline smiley: the comma key's hint, and the "back to emoji" key in search. */
+@Composable
+private fun SmileIcon(color: Color, modifier: Modifier) {
+    Canvas(modifier) {
         val u = size.width / 24f
         val stroke = Stroke(width = 2f * u, cap = StrokeCap.Round)
         drawCircle(color, radius = 10 * u, center = Offset(12 * u, 12 * u), style = stroke)

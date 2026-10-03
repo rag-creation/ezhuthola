@@ -1,0 +1,81 @@
+# Ezhuthola's own Manglish emoji words (GPL-3.0, part of Ezhuthola).
+# Most Manglish already works through the Malayalam CLDR keywords ("chiri" -> ചിരി).
+# This list adds everyday spellings and slang Unicode doesn't have,
+# plus a few English words where Unicode's order isn't what people expect (love -> ❤️ first).
+# Format: word,other spelling<TAB>emojis, best first, separated by spaces.
+chiri,chirikkuka,chirikk	😂 🤣 😄 😁 😆 😀
+punchiri	😊 🙂 😄 ☺️
+karachil,karayuka,karayunnu,kannuneer	😭 😢 🥲 😿
+sankadam,sangadam,vishamam,dukham	😢 😞 😔 🥺 💔
+deshyam,dheshyam,dhesyam,kalippu,kalip	😡 😠 🤬 😤
+pedi,bhayam	😨 😱 😰 🙀
+nanam,naanam	😳 🙈 ☺️
+sneham,ishtam,pranayam,premam,love,luv	❤️ 🥰 😍 💕 💖 💞
+umma,ummah	😘 😚 💋 😙
+kettippidi,hug	🤗 🫂
+adipoli,pwoli,poli,kidu,kidilan,kidilam,thakarthu,mass	🔥 😎 💯 🤩 👌
+kollam,kollaam,nannayi,super,set	👍 👌 👏 💯
+sheri,shari,ok,okay	👍 👌 🆗 ✅
+alla,illa,venda,vendaa	👎 🙅 ❌ 🚫
+nanni,thanks	🙏 😊 💐
+namaskaram,vanakkam	🙏
+uranganam,urakkam,urangi,ura	😴 💤 🛌
+vishakkunnu,vishapp,vishappu	😋 🍛 🤤
+kalyanam,kalyaanam,vivaham	💍 💒 👰 🤵
+pirannal,birthday,janmadinam	🎂 🎉 🎁 🥳
+aashamsakal,ashamsakal	🎉 🥳 💐 🎊
+thee,theeyy,agni	🔥
+mazha,mazhaa	🌧️ ☔ 🌦️ ⛈️
+veyil,choodu,chood	☀️ 🥵 🌞
+thanupp,thanuppu	🥶 ❄️
+veedu,veed	🏠 🏡
+amma	👩 🤱 ❤️
+achan,appa,acha	👨 👴
+kunj,kunju,vava,kutti	👶 🧒
+chaaya,chaya	☕ 🍵
+kaapi,kappi,coffee	☕
+choru,chor	🍚 🍛
+meen,meencurry	🐟 🐠 🍤
+mutta	🥚 🍳
+pazham,pazhum	🍌
+chakka	🍈
+manga,maanga	🥭
+thenga,thengu	🥥 🌴
+aana,aanakkutti	🐘
+poocha,pucha	🐈 🐱
+patti	🐕 🐶
+kozhi	🐔 🐓 🍗
+pashu	🐄 🐮
+paambu,pambu	🐍
+kakka,kaakka	🐦‍⬛
+poovu,poo,pookkalam	🌸 🌺 🌼 🌻 💐
+onam,pookalam	🌸 🌼 🛶 🍌
+vallam,vallamkali,boat	🛶 🚣
+kadal,kadalu	🌊 🏖️
+suryan,sooryan	☀️ 🌞
+chandran,ambili	🌙 🌕
+nakshathram,nakshatram,thaaram	⭐ 🌟 ✨
+kaasu,kash,paisa,panam	💰 💵 🪙 💸
+bus,vandi	🚌 🚗
+train,theevandi	🚆 🚂
+flight,vimaanam,vimanam	✈️
+padam,cinema,film	🎬 🍿 🎥
+paattu,pattu	🎵 🎶 🎤
+kalikkam,kali	⚽ 🏏 🎮
+pani,joli	💼 💻 😩
+padikkanam,padippu,padikk	📚 📖 ✍️
+pareeksha,exam	📝 😰
+sambhavam,scene	😬 😅 🤦
+chammal,chammi,chammippu	🙈 😅 🤭
+ayyo,ayyoo,ayyayyo	😱 😨 🤦
+eda,edaa,edi,machane,machan,aliya,aliyan	🤜 🤛 😎 🙌 🫂
+poda,podaa,podi	😤 🙄 😒
+endha,enthaa,entha	🤔 😳 🧐
+sathyam,sathyamayum	🤞 🙏
+kalla,kallam,nunna,nuna	🤥 🙄
+bhranth,branth,vatt,vattu	🤪 🥴 🌀
+rasam,rasamund	😄 🥳 😁
+madi,madiya	🥱 😪 🛋️
+shokam	💀 😵 🫠
+kili,pakshi	🐦 🦜 🕊️ 🐤
+kilipoyi	😵‍💫 🤯 🫠

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.ClipboardManager
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Paint
 import android.view.inputmethod.InputMethodManager
 import android.os.Handler
 import android.os.Looper
@@ -32,6 +33,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.rr.numio.ezhuthola.engine.Clip
 import com.rr.numio.ezhuthola.engine.ClipboardHistory
+import com.rr.numio.ezhuthola.engine.EmojiSearch
 import com.rr.numio.ezhuthola.engine.EnglishSuggester
 import com.rr.numio.ezhuthola.engine.MalayalamEngine
 import com.rr.numio.ezhuthola.engine.MalayalamRules
@@ -79,6 +81,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     /** Loaded in the background at start-up; null for the first moment. */
     @Volatile private var suggester: MalayalamSuggester? = null
     @Volatile private var english: EnglishSuggester? = null
+    @Volatile private var emojiSearch: EmojiSearch? = null
 
     /** Words this person taught the keyboard. Saved in the app's private files. */
     @Volatile private var mlUser: UserWords? = null
@@ -138,6 +141,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     (suggester?.commonness(w) ?: 0) >= 50
                 }, userWords = en)
             }
+            emojiSearch = loadEmojiSearch()
         }.start()
     }
 
@@ -165,6 +169,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     onSwitchKeyboard = {
                         getSystemService(InputMethodManager::class.java).showInputMethodPicker()
                     },
+                    searchEmoji = ::searchEmoji,
                     theme = theme,
                     photo = photo,
                     photoDim = photoDim,
@@ -444,6 +449,40 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     }
 
     private fun now() = System.currentTimeMillis()
+
+    // ---- Emoji search -----------------------------------------------------------
+
+    /**
+     * Unicode CLDR keywords (English + Malayalam) and Ezhuthola's own Manglish words.
+     * Emojis this phone's font can't draw are left out, so search never shows empty boxes.
+     */
+    private fun loadEmojiSearch(): EmojiSearch {
+        val paint = Paint()
+        val entries = assets.open("emoji_keywords.tsv").bufferedReader().useLines {
+            EmojiSearch.parseKeywords(it)
+        }.filter { paint.hasGlyph(it.emoji) }
+        val own = assets.open("emoji_manglish.tsv").bufferedReader().useLines {
+            EmojiSearch.parseManglish(it)
+        }
+        return EmojiSearch(entries, own)
+    }
+
+    /**
+     * Search from the emoji panel: "love", "chiri", "kollam".
+     * Manglish words are read by the Malayalam engine ("chiri" → ചിരി) and matched against
+     * Unicode's Malayalam keywords. The reading of the last word is shown under the search box.
+     */
+    private fun searchEmoji(query: String): EmojiResults {
+        val search = emojiSearch ?: return EmojiResults(emptyList())
+        val ml = suggester
+        val readings = HashMap<String, List<String>>()
+        fun read(word: String) = readings.getOrPut(word) { ml?.suggest(word)?.words ?: emptyList() }
+
+        val emojis = search.search(query, ::read)
+        val last = query.trim().substringAfterLast(' ')
+        val reading = if (last.length >= 2) read(last).firstOrNull() else null
+        return EmojiResults(emojis, reading)
+    }
 
     // ---- Learning your words ------------------------------------------------
 
