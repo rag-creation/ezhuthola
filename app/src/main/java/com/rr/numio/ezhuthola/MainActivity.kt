@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -342,10 +343,13 @@ private fun Footer() {
         Text("Made by a Keralite 💛", color = TextDim, fontSize = 12.sp)
         Spacer(Modifier.height(10.dp))
         Text(
-            "Word data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles",
+            "Word data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles\n" +
+                "Emoji names and keywords: Unicode CLDR and Unicode Emoji data " +
+                "© Unicode, Inc. (Unicode License v3)",
             color = TextDim.copy(alpha = 0.7f),
             fontSize = 11.sp,
-            lineHeight = 15.sp
+            lineHeight = 15.sp,
+            textAlign = TextAlign.Center
         )
     }
 }
