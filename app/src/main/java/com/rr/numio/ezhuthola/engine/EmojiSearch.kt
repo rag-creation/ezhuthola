@@ -168,12 +168,8 @@ class EmojiSearch(
             "😁", "🤣", "💕", "😢", "😅", "👌", "🎉", "💯", "😡", "🤔", "😎", "🙂",
         )
 
-        /**
-         * Loose spelling (see [MalayalamSuggester.looseKey]), plus ൃ = ്രു:
-         * Manglish "hrudayam" comes out as ഹ്രുദയം, Unicode spells it ഹൃദയം.
-         */
-        private fun loose(word: String) =
-            MalayalamSuggester.looseKey(word.replace("\u0D43", "\u0D4D\u0D30\u0D41"))
+        /** Loose spelling, see [MalayalamSuggester.looseKey] ("hrudayam" ഹ്രുദയം = ഹൃദയം). */
+        private fun loose(word: String) = MalayalamSuggester.looseKey(word)
 
         /** "face with tears of joy" → face, with, tears, of, joy. Colons and commas are dropped. */
         private fun words(text: String): List<String> =
