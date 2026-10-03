@@ -20,6 +20,9 @@ fragments and swear words removed, common contractions (don't, I'm…) added bac
 
 These adapted lists are shared under **CC BY-SA 4.0**, as the license requires.
 
+`app/src/main/assets/ml_extra_words.tsv` is Ezhuthola's own list (GPL-3.0) of common words the
+subtitle list is missing, like place names (കേരളം, തൃശ്ശൂർ, ദുബായ്) and festivals.
+
 ## Emoji search
 
 **Unicode CLDR** (Common Locale Data Repository) and **Unicode Emoji** data

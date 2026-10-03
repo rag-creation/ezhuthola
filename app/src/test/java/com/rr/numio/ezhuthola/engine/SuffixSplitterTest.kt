@@ -8,7 +8,10 @@ class SuffixSplitterTest {
 
     private val suggester = MalayalamSuggester(
         MalayalamEngine(MalayalamRules.fromJson(javaClass.getResource("/ezhuthola_rules.json")!!.readText())),
-        WordFrequencies.fromTsv(javaClass.getResource("/ml_words.tsv")!!.readText().lineSequence())
+        WordFrequencies.fromTsv(
+            javaClass.getResource("/ml_words.tsv")!!.readText().lineSequence() +
+                java.io.File("src/main/assets/ml_extra_words.tsv").readLines() // as the keyboard does
+        )
     )
 
     private fun best(typed: String) = suggester.suggest(typed).best
@@ -16,6 +19,14 @@ class SuffixSplitterTest {
     @Test fun anuswaramNounsTakeTtha() {
         assertEquals("പുസ്തകത്തിന്റെ", best("pusthakathinte")) // പുസ്തകം + ിന്റെ
         assertEquals("മലയാളത്തിൽ", best("malayalathil"))     // മലയാളം + ിൽ
+    }
+
+    @Test fun placesFromEzhutholasOwnList() {
+        assertEquals("കേരളത്തിൽ", best("keralathil"))       // കേരളം + ിൽ
+        assertEquals("കേരളം", best("keralam"))
+        assertEquals("ദുബായിലേക്ക്", best("dubaayilekku"))  // ദുബായ് (in the main list)
+        assertEquals("തൃശ്ശൂർ", best("thrissur"))
+        assertEquals("പത്തനംതിട്ടയിൽ", best("pathanamthittayil"))
     }
 
     @Test fun chilluBecomesFullLetterBeforeVowel() {

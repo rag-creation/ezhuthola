@@ -131,8 +131,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             val rules = MalayalamRules.fromJson(
                 assets.open("ezhuthola_rules.json").bufferedReader().use { it.readText() }
             )
+            // Ezhuthola's own extra words (places like കേരളം) are added after the main list.
+            val extra = assets.open("ml_extra_words.tsv").bufferedReader().use { it.readLines() }
             val words = assets.open("ml_words.tsv").bufferedReader().useLines {
-                WordFrequencies.fromTsv(it)
+                WordFrequencies.fromTsv(it + extra.asSequence())
             }
             suggester = MalayalamSuggester(MalayalamEngine(rules), words, userWords = ml)
             english = assets.open("en_words.tsv").bufferedReader().useLines {

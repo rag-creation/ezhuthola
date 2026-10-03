@@ -120,8 +120,15 @@ class MalayalamSuggester(
             put('ൻ', "ന്"); put('ൺ', "ന്"); put('ർ', "ര്"); put('ൽ', "ല്"); put('ൾ', "ല്"); put('ം', "മ്")
         }
 
-        /** Manglish "ch" is usually written double: ചേച്ചി (chechi), അച്ഛൻ (achan). */
-        private val foldPairs = listOf("ച്ഛ" to "ച", "ച്ച" to "ച")
+        /**
+         * Manglish "ch" and "th" are often written double: ചേച്ചി (chechi), അച്ഛൻ (achan),
+         * പത്തനംതിട്ട (pathanamthitta).
+         * ൃ is typed "ru" or "ri": hrudayam → ഹൃദയം, thrissur → തൃശ്ശൂർ.
+         */
+        private val foldPairs = listOf(
+            "ച്ഛ" to "ച", "ച്ച" to "ച", "ത്ത" to "ത",
+            "\u0D4D\u0D30\u0D41" to "\u0D43", "\u0D4D\u0D30\u0D3F" to "\u0D43", // ്രു, ്രി → ൃ
+        )
 
         fun looseKey(word: String): String {
             var w = word
