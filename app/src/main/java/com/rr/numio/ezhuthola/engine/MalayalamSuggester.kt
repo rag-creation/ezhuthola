@@ -121,18 +121,24 @@ class MalayalamSuggester(
         }
 
         /**
-         * Manglish "ch" and "th" are often written double: ചേച്ചി (chechi), അച്ഛൻ (achan),
-         * പത്തനംതിട്ട (pathanamthitta).
+         * Manglish "ch" is usually written double: ചേച്ചി (chechi), അച്ഛൻ (achan).
          * ൃ is typed "ru" or "ri": hrudayam → ഹൃദയം, thrissur → തൃശ്ശൂർ.
          */
         private val foldPairs = listOf(
-            "ച്ഛ" to "ച", "ച്ച" to "ച", "ത്ത" to "ത",
+            "ച്ഛ" to "ച", "ച്ച" to "ച",
             "\u0D4D\u0D30\u0D41" to "\u0D43", "\u0D4D\u0D30\u0D3F" to "\u0D43", // ്രു, ്രി → ൃ
         )
+
+        /**
+         * Manglish "th" inside a word is often ത്ത: പത്തനംതിട്ട (pathanamthitta).
+         * Not at the very start or end, or "but" would match ബൂത്ത് (booth).
+         */
+        private val doubleTha = Regex("(?<=.)ത്ത(?!്$)")
 
         fun looseKey(word: String): String {
             var w = word
             for ((from, to) in foldPairs) if (from in w) w = w.replace(from, to)
+            if ("ത്ത" in w) w = w.replace(doubleTha, "ത")
             return buildString(w.length) {
                 for (c in w) append(fold[c] ?: c)
             }
