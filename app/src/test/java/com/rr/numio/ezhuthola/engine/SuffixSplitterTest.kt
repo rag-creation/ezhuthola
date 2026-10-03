@@ -49,6 +49,12 @@ class SuffixSplitterTest {
         assertEquals("കാണണം", best("kaananam"))
     }
 
+    @Test fun englishWordsDontTurnIntoUnrelatedWords() {
+        // "but" once matched ബൂത്ത് (booth) through the ത്ത rule
+        assertEquals(false, suggester.suggest("but").words.contains("ബൂത്ത്"))
+        assertEquals(false, suggester.suggest("that").words.contains("ത്തത്"))
+    }
+
     @Test fun manglishChIsUsuallyDouble() {
         assertEquals("അച്ഛൻ", best("achan"))
         assertEquals("ചേച്ചി", best("chechi"))
