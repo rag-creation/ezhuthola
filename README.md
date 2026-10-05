@@ -106,6 +106,4 @@ Found a word that comes out wrong, or a word Ezhuthola doesn't know?
 
 ---
 
-Built by RR with help from Claude
-
-Made by RR · [Numio](https://getnumio.org) · Made by a Keralite 💛
+Built by RR with help from Claude · [Numio](https://getnumio.org) · Made by a Keralite 💛
