@@ -30,7 +30,7 @@ that movie subtitles miss or rank too low, like bro, tbh, ngl and lmao.
 
 **Unicode CLDR** (Common Locale Data Repository) and **Unicode Emoji** data
 - © Unicode, Inc. Unicode and the Unicode Logo are registered trademarks of Unicode, Inc.
-- License: [Unicode License v3](https://www.unicode.org/license.txt)
+- License: [Unicode License v3](licenses/Unicode-License-v3.txt) (also at https://www.unicode.org/license.txt)
 - Sources:
   - CLDR annotations, English and Malayalam (`cldr-annotations-full`, `cldr-annotations-derived-full`, CLDR 48): https://github.com/unicode-org/cldr-json
   - `emoji-test.txt`, Unicode Emoji 17.0: https://github.com/unicode-org/unicodetools/tree/main/unicodetools/data/emoji/17.0
@@ -86,3 +86,12 @@ authorization of the copyright holder.
 
 SPDX-License-Identifier: Unicode-3.0
 ```
+
+## Libraries
+
+**AndroidX** (Jetpack Compose, Material 3, Core, Lifecycle, Activity, Emoji2 Emoji Picker)
+by Google / The Android Open Source Project
+- License: [Apache License 2.0](licenses/Apache-2.0.txt)
+- Used for: the app and keyboard UI, and the emoji panel
+
+Emoji images are drawn by the phone's own emoji font; none are bundled in the app.
