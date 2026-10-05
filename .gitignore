@@ -14,3 +14,10 @@
 .cxx
 local.properties
 .idea/
+
+# Release builds and signing keys
+*.apk
+*.aab
+/app/release/
+*.jks
+*.keystore
