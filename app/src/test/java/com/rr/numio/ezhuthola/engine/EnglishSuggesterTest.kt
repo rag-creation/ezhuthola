@@ -70,4 +70,64 @@ class EnglishSuggesterTest {
     @Test fun correctionShownInStrip() {
         assertEquals("setting", words("setteng").first())
     }
+
+    // ---- Chat words and learning from what you type --------------------------
+
+    private val mainLines = javaClass.getResource("/en_words.tsv")!!.readText()
+    private val extraLines = javaClass.getResource("/en_extra_words.tsv")!!.readText()
+
+    private fun chatEnglish(used: UserWords = UserWords()) = EnglishSuggester.fromTsv(
+        mainLines.lineSequence(), extra = extraLines.lineSequence(), used = used
+    )
+
+    @Test fun chatWordsAreSuggested() {
+        val chat = chatEnglish()
+        assertTrue("bro" in chat.suggest("br").words)
+        assertTrue("tbh" in chat.suggest("tb").words)
+        assertTrue("ngl" in chat.suggest("ng").words)
+        assertTrue("idk" in chat.suggest("id").words)
+        assertTrue("swag" in chat.suggest("swa").words)
+        assertEquals("ohh", chat.suggest("oh").words.first())   // not "ohio"
+    }
+
+    @Test fun extraListKeepsTheMainListsOrder() {
+        val chat = chatEnglish()
+        assertEquals("tomorrow", chat.suggest("tomo").words.first())
+        assertEquals("setting", chat.suggest("setteng").best)
+        assertEquals("the", chat.suggest("teh").best)
+        assertEquals("don't", chat.suggest("dont").words.first())
+    }
+
+    @Test fun chatWordsAreNotCorrected() {
+        val chat = chatEnglish()
+        for (w in listOf("tbh", "ngl", "idk", "lmao", "bruh", "swag", "pls")) {
+            assertEquals(w, chat.suggest(w).best)
+        }
+    }
+
+    @Test fun wordsYouUseMoveUp() {
+        val used = UserWords()
+        val chat = chatEnglish(used)
+        assertEquals("drink", chat.suggest("dr").words.first())
+        used.learn("drama")
+        used.learn("drama")
+        assertEquals("drama", chat.suggest("dr").words.first())
+        assertEquals("swag", chatEnglish(UserWords().apply { learn("swag") }).suggest("sw").words.first())
+    }
+
+    @Test fun usedWordsOutsideTheFirstMatchesStillShow() {
+        val used = UserWords()
+        repeat(3) { used.learn("brochure") }
+        assertEquals("brochure", chatEnglish(used).suggest("br").words.first())
+    }
+
+    @Test fun knowsListedAndTaughtWords() {
+        val taught = UserWords()
+        val en = EnglishSuggester.fromTsv(mainLines.lineSequence(), userWords = taught)
+        assertTrue(en.knows("Brother"))
+        assertTrue(!en.knows("ngl"))
+        assertTrue(chatEnglish().knows("ngl"))
+        taught.learn("arun")
+        assertTrue(en.knows("arun"))
+    }
 }

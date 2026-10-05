@@ -1,0 +1,132 @@
+# Ezhuthola's own extra English words (GPL-3.0, part of Ezhuthola).
+# The subtitle word list (FrequencyWords) comes from movies, so chat words are missing or buried:
+# "tbh" and "ngl" aren't there at all, and "bro" ranks below "brother", "bring" and "break".
+# Format: word<TAB>count. A word already in the main list keeps whichever count is higher.
+# Counts are made up in three tiers: 200000 = everyday chat, 50000 = common, 15000 = less common.
+
+# ---- Everyday chat ----
+bro	200000
+lol	200000
+omg	200000
+btw	200000
+idk	200000
+tbh	200000
+pls	200000
+haha	200000
+hmm	200000
+ohh	200000
+nah	200000
+yup	200000
+okk	200000
+
+# ---- Common chat and slang ----
+bruh	50000
+broo	50000
+sis	50000
+swag	50000
+lmao	50000
+ngl	50000
+imo	50000
+ikr	50000
+smh	50000
+brb	50000
+thx	50000
+plz	50000
+ur	50000
+kk	50000
+ohk	50000
+hahaha	50000
+hehe	50000
+hmmm	50000
+aww	50000
+awww	50000
+yaa	50000
+meh	50000
+vibe	50000
+vibes	50000
+lowkey	50000
+fam	50000
+bestie	50000
+congrats	50000
+bday	50000
+pic	50000
+pics	50000
+msg	50000
+selfie	50000
+lemme	50000
+sorta	50000
+fr	50000
+yaar	50000
+bhai	50000
+
+# ---- Apps and phone words ----
+whatsapp	50000
+insta	50000
+instagram	50000
+youtube	50000
+google	50000
+wifi	50000
+emoji	50000
+emojis	50000
+app	50000
+apps	50000
+online	50000
+offline	15000
+reels	15000
+dm	15000
+dms	15000
+gif	15000
+gifs	15000
+meme	15000
+memes	15000
+vid	15000
+vids	15000
+msgs	15000
+txt	15000
+
+# ---- Less common ----
+rofl	15000
+omw	15000
+idc	15000
+imho	15000
+irl	15000
+ttyl	15000
+gtg	15000
+np	15000
+hbd	15000
+gn	15000
+gm	15000
+tmrw	15000
+tmr	15000
+xoxo	15000
+wfh	15000
+bf	15000
+gf	15000
+ily	15000
+bae	15000
+highkey	15000
+sus	15000
+cringe	15000
+salty	15000
+slay	15000
+bhaiya	15000
+
+# ---- Places, festivals and food (Kerala and the UAE) ----
+kerala	15000
+malayali	15000
+mallu	15000
+onam	15000
+vishu	15000
+kochi	15000
+thrissur	15000
+calicut	15000
+trivandrum	15000
+uae	15000
+dubai	15000
+sharjah	15000
+ajman	15000
+dhabi	15000
+biryani	15000
+shawarma	15000
+karak	15000
+chai	15000

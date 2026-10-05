@@ -38,4 +38,26 @@ class UserWordsTest {
         assertEquals("machane", en.suggest("machane").best)
         assertEquals("machane", en.suggest("mach").words.first())
     }
+
+    @Test fun rankedMostUsedFirst() {
+        val words = UserWords()
+        words.learn("b"); words.learn("a"); words.learn("c"); words.learn("c")
+        assertEquals(listOf("c" to 2, "a" to 1, "b" to 1), words.ranked())
+    }
+
+    @Test fun keepsToItsLimit() {
+        val words = UserWords(maxWords = 10)
+        repeat(3) { words.learn("often") }
+        for (i in 1..20) words.learn("w$i")
+        assertTrue(words.words.size <= 10)
+        assertTrue("often" in words)
+    }
+
+    @Test fun clearEmptiesAndMarksDirty() {
+        val words = UserWords.fromTsv("swag\t3")
+        assertFalse(words.dirty)
+        words.clear()
+        assertTrue(words.isEmpty())
+        assertTrue(words.dirty)
+    }
 }

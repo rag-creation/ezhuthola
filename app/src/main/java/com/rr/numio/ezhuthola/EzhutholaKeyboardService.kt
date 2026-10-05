@@ -42,6 +42,7 @@ import com.rr.numio.ezhuthola.engine.Suggestions
 import com.rr.numio.ezhuthola.engine.UserWords
 import com.rr.numio.ezhuthola.engine.WordFrequencies
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * The keyboard itself. Android starts this service whenever Ezhuthola is the active keyboard.
@@ -87,6 +88,17 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     @Volatile private var mlUser: UserWords? = null
     @Volatile private var enUser: UserWords? = null
 
+    /** English words you type (known ones move up) and ones the keyboard didn't know. */
+    @Volatile private var enUsed: UserWords? = null
+    @Volatile private var enMissing: UserWords? = null
+    private var ignoredMissing: Set<String> = emptySet()
+
+    /** Incognito fields (private browser tabs and such) ask keyboards not to learn anything. */
+    private var noLearning = false
+
+    /** Word files are written one at a time, in order, off the main thread. */
+    private val fileWriter = Executors.newSingleThreadExecutor()
+
     // ---- Clipboard ----
     private val clipboard by lazy { getSystemService(ClipboardManager::class.java) }
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener { onCopied() }
@@ -125,9 +137,14 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                 mainHandler.post { history = loaded }
             }
             val ml = readUserWords(ML_USER_FILE)
-            val en = readUserWords(EN_USER_FILE)
+            val en = readUserWords(LearnedWords.TAUGHT_FILE)
+            val used = readUserWords(LearnedWords.USED_FILE)
+            val missing = LearnedWords.read(this, LearnedWords.MISSING_FILE, LearnedWords.MISSING_MAX)
             mlUser = ml
             enUser = en
+            enUsed = used
+            enMissing = missing
+            mainHandler.post(::applyWordRequests) // anything added or dismissed in settings
             val rules = MalayalamRules.fromJson(
                 assets.open("ezhuthola_rules.json").bufferedReader().use { it.readText() }
             )
@@ -137,11 +154,14 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                 WordFrequencies.fromTsv(it + extra.asSequence())
             }
             suggester = MalayalamSuggester(MalayalamEngine(rules), words, userWords = ml)
+            // Ezhuthola's own chat words (bro, tbh, ngl) are merged into the subtitle list.
+            val enExtra = assets.open("en_extra_words.tsv").bufferedReader().use { it.readLines() }
             english = assets.open("en_words.tsv").bufferedReader().useLines {
                 // Manglish like "poda" or "adipoli" is never "corrected" into English.
-                EnglishSuggester.fromTsv(it, isManglish = { w ->
-                    (suggester?.commonness(w) ?: 0) >= 50
-                }, userWords = en)
+                EnglishSuggester.fromTsv(
+                    it, isManglish = ::isManglish, userWords = en,
+                    extra = enExtra.asSequence(), used = used
+                )
             }
             emojiSearch = loadEmojiSearch()
         }.start()
@@ -214,6 +234,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         plainField = info?.let(::isPlainField) ?: false
         startWithNumbers = info?.let(::isNumberField) ?: false
         passwordField = info?.let(::isPasswordField) ?: false
+        noLearning = info != null &&
+                (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
         // `restarting` = same field, the app just refreshed it: keep the current page.
         if (!restarting) session++
         applySettings()
@@ -231,6 +253,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     override fun onDestroy() {
         super.onDestroy()
         clipboard.removePrimaryClipChangedListener(clipListener)
+        saveUserWords()
+        fileWriter.shutdown() // writes already queued still finish
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
     }
 
@@ -360,9 +384,31 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             ic?.setComposingText(s.best, 1)
             undo = s.best to s.typed
         }
+        if (!malayalam) noteEnglishWord(s?.best ?: word.toString())
         ic?.finishComposingText()
         resetWord()
     }
+
+    /**
+     * Learn from an English word that was just typed. A known word counts as used, so it moves
+     * up in completions. An unknown one goes on the "Missing words" list in settings, unless
+     * it's Manglish (Malayalam mode handles that) or you dismissed it before.
+     * Nothing is learned in incognito fields, and password fields never get here.
+     */
+    private fun noteEnglishWord(typed: String) {
+        if (noLearning || plainField) return
+        val en = english ?: return
+        val lower = typed.lowercase()
+        if (lower.length < 2 || lower.length > 30 || !lower.all { it in 'a'..'z' || it == '\'' }) return
+        if (en.knows(lower)) {
+            enUsed?.learn(lower)
+        } else if (!isManglish(lower) && lower !in ignoredMissing) {
+            enMissing?.learn(lower)
+        }
+    }
+
+    /** Common Manglish like "poda" or "adipoli" (it's in the Malayalam word list). */
+    private fun isManglish(word: String) = (suggester?.commonness(word) ?: 0) >= 50
 
     /** Backspace right after a correction puts back what was typed: "setting " → setteng. */
     private fun undoCorrection(): Boolean {
@@ -373,6 +419,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         ic.deleteSurroundingText(fixed.length + 1, 0)
         ic.commitText(typed, 1)
         enUser?.learn(typed.lowercase()) // "machane" won't be "corrected" again
+        enMissing?.forget(typed.lowercase())
         return true
     }
 
@@ -380,6 +427,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     /** Picks up anything changed in the app screen: theme, photo, vibration, sound, clipboard. */
     private fun applySettings() {
+        applyWordRequests()
         theme = Themes.byId(prefs.getString(KeyboardSettings.THEME, Themes.Numio.id))
         photoDim = prefs.getFloat(KeyboardSettings.PHOTO_DIM, 0.45f)
         feedback = KeyFeedback(
@@ -495,7 +543,12 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      */
     private fun learn(chosen: String) {
         val typed = suggestions?.typed ?: return
-        if (malayalam && chosen != typed) mlUser?.learn(chosen) else enUser?.learn(chosen.lowercase())
+        if (malayalam && chosen != typed) {
+            mlUser?.learn(chosen)
+        } else {
+            enUser?.learn(chosen.lowercase())
+            enMissing?.forget(chosen.lowercase())
+        }
     }
 
     private fun readUserWords(name: String): UserWords {
@@ -503,12 +556,33 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         return if (file.exists()) UserWords.fromTsv(file.readText()) else UserWords()
     }
 
+    /**
+     * The app screen's "Missing words" list leaves requests (add, dismiss, clear) instead of
+     * changing the files itself; carry them out here. Runs on the main thread.
+     */
+    private fun applyWordRequests() {
+        val taught = enUser ?: return
+        val missing = enMissing ?: return
+        ignoredMissing = LearnedWords.applyRequests(this, taught, missing)
+        writeChangedWords() // so the list in the app screen is up to date
+    }
+
     /** Writes learned words to the phone's storage (in the background, only if changed). */
     private fun saveUserWords() {
-        for ((words, name) in listOf(mlUser to ML_USER_FILE, enUser to EN_USER_FILE)) {
+        applyWordRequests() // e.g. "Add" tapped while the keyboard was open in the Try it box
+        writeChangedWords()
+    }
+
+    private fun writeChangedWords() {
+        for ((words, name) in listOf(
+            mlUser to ML_USER_FILE,
+            enUser to LearnedWords.TAUGHT_FILE,
+            enUsed to LearnedWords.USED_FILE,
+            enMissing to LearnedWords.MISSING_FILE,
+        )) {
             if (words == null || !words.dirty) continue
             val text = words.toTsv()
-            Thread { File(filesDir, name).writeText(text) }.start()
+            fileWriter.execute { File(filesDir, name).writeText(text) }
         }
     }
 
@@ -576,7 +650,6 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     private companion object {
         const val ML_USER_FILE = "user_words_ml.tsv"
-        const val EN_USER_FILE = "user_words_en.tsv"
         const val CLIPS_FILE = "pinned_clips.txt"
     }
 }

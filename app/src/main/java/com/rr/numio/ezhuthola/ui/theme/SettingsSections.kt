@@ -3,6 +3,7 @@ package com.rr.numio.ezhuthola
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,8 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -59,11 +62,12 @@ private val AccentSoft = Color(0x2EF5C427)
 private val Ink = Color(0xFF141414)
 
 /**
- * The "TYPING" and "KEYBOARD LOOK" sections of the app screen.
+ * The "TYPING", "MISSING WORDS" and "KEYBOARD LOOK" sections of the app screen.
  * Changes are saved straight away; the keyboard picks them up the next time it opens.
+ * [refreshKey] changes when you come back to the app, so the missing words list is read again.
  */
 @Composable
-fun KeyboardSettingsSections() {
+fun KeyboardSettingsSections(refreshKey: Int = 0) {
     val context = LocalContext.current
     val prefs = remember { KeyboardSettings.prefs(context) }
     val scope = rememberCoroutineScope()
@@ -131,6 +135,11 @@ fun KeyboardSettingsSections() {
             modifier = Modifier.padding(vertical = 12.dp)
         )
     }
+
+    // ---- MISSING WORDS ----
+    Spacer(Modifier.height(10.dp))
+    Label("MISSING WORDS")
+    MissingWordsCard(refreshKey)
 
     // ---- KEYBOARD LOOK ----
     Spacer(Modifier.height(10.dp))
@@ -212,6 +221,126 @@ fun KeyboardSettingsSections() {
                     fontSize = 13.sp,
                     lineHeight = 18.sp
                 )
+            }
+        }
+    }
+}
+
+/**
+ * English words you typed that Ezhuthola didn't know, most typed first.
+ * Add keeps the word (suggested, never corrected); ✕ hides it for good.
+ */
+@Composable
+private fun MissingWordsCard(refreshKey: Int) {
+    val context = LocalContext.current
+    var version by remember { mutableIntStateOf(0) }
+    var showAll by remember { mutableStateOf(false) }
+    val words by produceState(emptyList<Pair<String, Int>>(), refreshKey, version) {
+        value = withContext(Dispatchers.IO) { LearnedWords.missing(context) }
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Card)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Text(
+            if (words.isEmpty()) {
+                "English words you type that Ezhuthola doesn't know yet will show up here, " +
+                        "so you can add them. This list stays on your phone."
+            } else {
+                "Words you typed that Ezhuthola didn't know. Add the ones you use: they'll be " +
+                        "suggested and never corrected. Only on your phone."
+            },
+            color = TextDim,
+            fontSize = 13.sp,
+            lineHeight = 18.sp
+        )
+        if (words.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            val shown = if (showAll) words else words.take(MISSING_SHOWN)
+            shown.forEach { (word, count) ->
+                MissingWordRow(
+                    word = word,
+                    count = count,
+                    onAdd = { LearnedWords.add(context, word); version++ },
+                    onDismiss = { LearnedWords.dismiss(context, word); version++ }
+                )
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (words.size > MISSING_SHOWN) {
+                    Text(
+                        if (showAll) "Show fewer" else "Show all ${words.size}",
+                        color = Accent,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { showAll = !showAll }
+                            .padding(vertical = 8.dp, horizontal = 4.dp)
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "Clear list",
+                    color = TextDim,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { LearnedWords.clearMissing(context); version++ }
+                        .padding(vertical = 8.dp, horizontal = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+private const val MISSING_SHOWN = 15
+
+@Composable
+private fun MissingWordRow(word: String, count: Int, onAdd: () -> Unit, onDismiss: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(word, color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                if (count == 1) "typed once" else "typed $count times",
+                color = TextDim,
+                fontSize = 12.sp
+            )
+        }
+        Text(
+            "Add",
+            color = Accent,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(AccentSoft)
+                .clickable(onClick = onAdd)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF242424))
+                .clickable(onClickLabel = "Dismiss $word", onClick = onDismiss),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(Modifier.size(12.dp)) {
+                val stroke = 2.dp.toPx()
+                val ink = Color(0xFFC8C8C8)
+                drawLine(ink, Offset.Zero, Offset(size.width, size.height), stroke, StrokeCap.Round)
+                drawLine(ink, Offset(size.width, 0f), Offset(0f, size.height), stroke, StrokeCap.Round)
             }
         }
     }

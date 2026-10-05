@@ -6,6 +6,7 @@ package com.rr.numio.ezhuthola.engine
  *
  * Words come from en_words.tsv ("word<TAB>count", most common first).
  * Data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles.
+ * Ezhuthola's own en_extra_words.tsv adds chat words the subtitles miss or bury (bro, tbh, ngl).
  *
  * [Suggestions.best] is what space types: what you typed if it is a real word,
  * otherwise a correction when there is a close one. The typed chip keeps your own word
@@ -18,6 +19,8 @@ class EnglishSuggester(
     private val isManglish: (String) -> Boolean = { false },
     /** Words this person taught the keyboard: never corrected, suggested first. */
     private val userWords: UserWords = UserWords(),
+    /** Known words this person types, with how often: they move up in completions ("br" → bro). */
+    private val used: UserWords = UserWords(),
 ) {
     private val rankOf = HashMap<String, Int>(words.size * 2).apply {
         words.forEachIndexed { i, w -> putIfAbsent(w, i) }
@@ -26,11 +29,17 @@ class EnglishSuggester(
     /** Words without apostrophes, so "dont" finds don't and "im" finds I'm. */
     private val plain: Array<String> = Array(words.size) { words[it].replace("'", "") }
 
+    /** True when the word is in the list or was taught. Anything else may be a missing word. */
+    fun knows(word: String): Boolean {
+        val lower = word.lowercase()
+        return lower in rankOf || lower in userWords
+    }
+
     fun suggest(typed: String): Suggestions {
         if (typed.isEmpty()) return Suggestions("", "", emptyList())
         val lower = typed.lowercase()
         val rank = rankOf[lower]
-        val commonWord = (rank != null && rank < COMMON) || lower in userWords
+        val commonWord = (rank != null && rank < COMMON) || lower in userWords || used.count(lower) >= 2
 
         // 1. Typo corrections. Common words are never touched ("form" stays form).
         val corrections = if (commonWord || lower.length < 3) emptyList() else corrections(lower)
@@ -49,12 +58,23 @@ class EnglishSuggester(
             .sortedByDescending { userWords.count(it) }
             .take(maxShown)
             .forEach { completions += it }
-        for (i in words.indices) {
-            if (completions.size == maxShown) break
-            if (plain[i].startsWith(lower) && words[i] != lower && words[i] !in completions) {
-                completions += words[i]
-                if (completions.size == maxShown) break
+        if (completions.size < maxShown) {
+            // The most common words that fit, plus the ones this person uses, then the ones
+            // they use often move up: type "bro" a couple of times and "br" offers it first.
+            val pool = LinkedHashSet<String>()
+            for (i in words.indices) {
+                if (plain[i].startsWith(lower) && words[i] != lower) {
+                    pool += words[i]
+                    if (pool.size == POOL) break
+                }
             }
+            used.words.forEach { w ->
+                if (w != lower && w in rankOf && w.replace("'", "").startsWith(lower)) pool += w
+            }
+            pool.filter { it !in completions }
+                .sortedBy { completionScore(it) }
+                .take(maxShown - completions.size)
+                .forEach { completions += it }
         }
 
         // Strip order: the auto-correction first, then completions, then other corrections.
@@ -78,6 +98,13 @@ class EnglishSuggester(
     private class Candidate(val word: String, val cost: Int, val score: Double)
 
     private fun score(cost: Int, rank: Int) = cost + kotlin.math.log10(rank + 2.0)
+
+    /** Lower is better: how common the word is, minus a bonus for each time this person used it. */
+    private fun completionScore(word: String): Double {
+        val rank = rankOf[word] ?: words.size
+        val uses = used.count(word)
+        return kotlin.math.log10(rank + 2.0) - USE_BONUS * kotlin.math.log2(1.0 + uses)
+    }
 
     private fun showLimit(length: Int) = if (length >= 5) 4 else 2      // shown in the strip
 
@@ -148,15 +175,51 @@ class EnglishSuggester(
         /** Words this common are always left as typed. */
         private const val COMMON = 20_000
 
+        /** How many common words that fit are considered before ranking completions. */
+        private const val POOL = 12
+
+        /** Each doubling of how often you've used a word is worth this much rank (as log10). */
+        private const val USE_BONUS = 1.5
+
+        /**
+         * [lines] is the main list, most common first. [extra] lines (Ezhuthola's own words)
+         * are merged in by count: a word already in the list keeps whichever count is higher.
+         * Blank lines and lines starting with # are skipped.
+         */
         fun fromTsv(
             lines: Sequence<String>,
             isManglish: (String) -> Boolean = { false },
             userWords: UserWords = UserWords(),
-        ): EnglishSuggester =
-            EnglishSuggester(lines.mapNotNull { line ->
-                val tab = line.indexOf('\t')
-                if (tab > 0) line.substring(0, tab) else null
-            }.toList(), isManglish = isManglish, userWords = userWords)
+            extra: Sequence<String> = emptySequence(),
+            used: UserWords = UserWords(),
+        ): EnglishSuggester {
+            val counts = LinkedHashMap<String, Long>()
+            for (line in lines) {
+                val (word, count) = parse(line) ?: continue
+                counts.putIfAbsent(word, count)
+            }
+            var merged = false
+            for (line in extra) {
+                val (word, count) = parse(line) ?: continue
+                if (count > (counts[word] ?: 0L)) {
+                    counts[word] = count
+                    merged = true
+                }
+            }
+            // The main list is already in order; sortedBy is stable, so equal counts keep their place.
+            val ordered = if (merged) counts.entries.sortedByDescending { it.value }.map { it.key }
+            else counts.keys.toList()
+            return EnglishSuggester(ordered, isManglish = isManglish, userWords = userWords, used = used)
+        }
+
+        private fun parse(line: String): Pair<String, Long>? {
+            if (line.isBlank() || line.startsWith("#")) return null
+            val tab = line.indexOf('\t')
+            if (tab <= 0) return null
+            val word = line.substring(0, tab).trim().lowercase()
+            val count = line.substring(tab + 1).trim().toLongOrNull() ?: 0L
+            return if (word.isEmpty()) null else word to count
+        }
 
         /** Where each letter sits on the QWERTY keys (rows are shifted like the real keyboard). */
         private val keyPos: Map<Char, Pair<Double, Int>> = buildMap {
