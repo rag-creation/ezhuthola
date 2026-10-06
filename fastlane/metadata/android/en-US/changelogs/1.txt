@@ -1,0 +1,6 @@
+First release.
+- Type Malayalam in Manglish with word suggestions
+- English suggestions and autocorrect
+- Emoji search in English, Manglish and Malayalam
+- Clipboard history, themes and your own photo
+- No permissions, no ads, no tracking

@@ -1,0 +1,33 @@
+<p><b>Type Malayalam the way you text: in Manglish.</b> Type <i>ente keralam</i> and get എന്റെ കേരളം.</p>
+
+<p>Ezhuthola (എഴുത്തോല, the palm-leaf manuscript) is a free, open-source Malayalam keyboard. It asks for <b>no permissions at all</b>, not even internet, so nothing you type ever leaves your phone. No ads, no accounts, no tracking.</p>
+
+<p><b>Malayalam (Manglish)</b></p>
+<ul>
+<li>Type in English letters and get Malayalam: njan → ഞാൻ, adipoli → അടിപൊളി</li>
+<li>Its own transliteration engine, written from scratch</li>
+<li>Word suggestions ranked by how often Malayalam words are really used</li>
+<li>Word forms with endings: keralathil → കേരളത്തിൽ</li>
+<li>Learns your words: the spellings you pick come first next time</li>
+</ul>
+
+<p><b>English</b></p>
+<ul>
+<li>Word suggestions and completion</li>
+<li>Autocorrect, with backspace to undo it</li>
+<li>Knows chat words like bro, tbh and ngl, and leaves your Manglish alone</li>
+<li>A Missing words list in settings shows words it doesn't know yet, so you can add them</li>
+</ul>
+
+<p><b>Everything else</b></p>
+<ul>
+<li>One tap on the yellow ola key switches between Malayalam and English</li>
+<li>Emoji search in English, Manglish and Malayalam: love, chiri, sneham, ചിരി</li>
+<li>Clipboard history: tap to paste, hold to pin. Passwords and OTPs are never saved</li>
+<li>Themes: Numio, Black &amp; White, Light, Blue Night, or your own photo</li>
+<li>Number hints on the top row, ₹ on both symbol pages</li>
+</ul>
+
+<p>Word data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles. Emoji names and keywords: Unicode CLDR and Unicode Emoji data (Unicode License v3).</p>
+
+<p>Part of Numio, small honest apps made by a Keralite: https://getnumio.org</p>

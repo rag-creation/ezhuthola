@@ -29,6 +29,11 @@ class SuffixSplitterTest {
         assertEquals("പത്തനംതിട്ടയിൽ", best("pathanamthittayil"))
     }
 
+    @Test fun theAppSpellsItsOwnName() {
+        assertEquals("എഴുത്തോല", best("ezhuthola"))
+        assertEquals("എഴുത്തോല", best("ezhuththola"))
+    }
+
     @Test fun chilluBecomesFullLetterBeforeVowel() {
         assertEquals("അച്ഛനോട്", best("achanodu"))           // അച്ഛൻ + ോട്
     }

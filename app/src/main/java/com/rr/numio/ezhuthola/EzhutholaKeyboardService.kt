@@ -38,6 +38,7 @@ import com.rr.numio.ezhuthola.engine.EnglishSuggester
 import com.rr.numio.ezhuthola.engine.MalayalamEngine
 import com.rr.numio.ezhuthola.engine.MalayalamRules
 import com.rr.numio.ezhuthola.engine.MalayalamSuggester
+import com.rr.numio.ezhuthola.engine.MissingWordFilter
 import com.rr.numio.ezhuthola.engine.Suggestions
 import com.rr.numio.ezhuthola.engine.UserWords
 import com.rr.numio.ezhuthola.engine.WordFrequencies
@@ -403,7 +404,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         if (en.knows(lower)) {
             enUsed?.learn(lower)
         } else if (!isManglish(lower) && lower !in ignoredMissing) {
-            enMissing?.learn(lower)
+            // Skip bits like "qr" and pieces of links ("https", "getnumio" in https://getnumio.org).
+            val before = currentInputConnection?.getTextBeforeCursor(64, 0)?.toString() ?: lower
+            if (MissingWordFilter.worthNoting(lower, before)) enMissing?.learn(lower)
         }
     }
 

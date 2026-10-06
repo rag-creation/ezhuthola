@@ -59,6 +59,16 @@ Ezhuthola is different:
 - ✅ Vibration and key sound settings
 - ✅ Hold the space bar to switch keyboards
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.jpg" width="180" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.jpg" width="180" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.jpg" width="180" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.jpg" width="180" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.jpg" width="180" />
+</p>
+
 ## 📲 Install
 
 - **GitHub:** download the APK from [Releases](https://github.com/rag-creation/ezhuthola/releases)

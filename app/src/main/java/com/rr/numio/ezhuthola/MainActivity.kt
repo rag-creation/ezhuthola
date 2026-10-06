@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -337,8 +338,14 @@ private fun PrivacyCard() {
 
 @Composable
 private fun Footer() {
+    // The real version from build.gradle.kts, so it never goes stale
+    val context = LocalContext.current
+    val version = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+            .getOrNull() ?: ""
+    }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("v0.2 · Free & open source (GPL-3.0)", color = TextDim, fontSize = 12.sp)
+        Text("v$version · Free & open source (GPL-3.0)", color = TextDim, fontSize = 12.sp)
         Spacer(Modifier.height(4.dp))
         Text("Made by a Keralite 💛", color = TextDim, fontSize = 12.sp)
         Spacer(Modifier.height(10.dp))
