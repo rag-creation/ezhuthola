@@ -36,6 +36,9 @@ class EmojiSearch(
     /** Emojis people use most get a small push, so "love" shows ❤️ before 💌. */
     private val popular = HashSet<Int>()
 
+    /** Emojis that match a word only by accident get pushed back ("love" → 🏩 love hotel). */
+    private val rare = HashSet<Int>()
+
     init {
         val position = HashMap<String, Int>()
         entries.forEachIndexed { i, e ->
@@ -50,6 +53,7 @@ class EmojiSearch(
             e.mlWords.flatMap(::words).forEach { malayalam.add(loose(it), i, KEYWORD) }
         }
         POPULAR.forEach { e -> (position[e] ?: position[e.replace(VS16, "")])?.let(popular::add) }
+        RARE.forEach { e -> (position[e] ?: position[e.replace(VS16, "")])?.let(rare::add) }
         manglish.forEach { (word, list) ->
             list.forEachIndexed { rank, emoji ->
                 // The first emoji listed for a word is the best one for it.
@@ -60,6 +64,23 @@ class EmojiSearch(
     }
 
     val size: Int get() = emojis.size
+
+    /** A whole English emoji word ("love", "angry"): no Manglish reading needed. */
+    fun isEnglishWord(term: String): Boolean = english.containsKey(term.trim().lowercase())
+
+    /**
+     * The Malayalam to show under the search box: the first reading that really matches
+     * Unicode's Malayalam emoji words ("chiri" → ചിരി). English words get none, so
+     * "love" never shows a made-up reading like ലോവെ.
+     */
+    fun bestReading(term: String, readings: List<String>): String? {
+        if (isEnglishWord(term)) return null
+        return readings.take(MAX_READINGS).firstOrNull { word ->
+            val key = searchKey(word)
+            key.length >= 2 &&
+                (malayalam.containsKey(key) || malayalam.subMap(key, false, key + '\uFFFF', false).isNotEmpty())
+        }
+    }
 
     /**
      * Emojis for [query], best first.
@@ -96,6 +117,7 @@ class EmojiSearch(
             if (total.isEmpty()) return emptyList()
         }
         for (i in popular) total!!.computeIfPresent(i) { _, s -> s + POPULAR_BONUS }
+        for (i in rare) total!!.computeIfPresent(i) { _, s -> s - RARE_PENALTY }
         return total!!.entries
             .sortedWith(compareByDescending<Map.Entry<Int, Int>> { it.value }.thenBy { it.key })
             .take(limit)
@@ -115,10 +137,14 @@ class EmojiSearch(
             match(manglishIndex, term, minPrefix = 3, ::hit)
         }
 
-        val mlWords = if (isMalayalamScript) listOf(term) else readings(term)
+        // A whole English emoji word ("love") isn't Manglish, so don't guess Malayalam for it.
+        val mlWords = when {
+            isMalayalamScript -> listOf(term)
+            english.containsKey(term) -> emptyList()
+            else -> readings(term)
+        }
         for (word in mlWords.take(MAX_READINGS)) {
-            // While typing "chir" the engine says ചിർ; drop the end mark so it still finds ചിരി.
-            val key = loose(word).trimEnd(VIRAMA)
+            val key = searchKey(word)
             if (key.length < 2) continue
             // Manglish is a guess, so it counts a little less than an English word.
             match(malayalam, key, minPrefix = 2) { i, s -> hit(i, s - 2) }
@@ -161,12 +187,23 @@ class EmojiSearch(
         private const val MAX_READINGS = 6
         private const val VS16 = "\uFE0F"  // "show as emoji" mark
         private const val VIRAMA = '\u0D4D'
+        private const val ANUSWARAM = '\u0D02'      // ം
 
         private const val POPULAR_BONUS = 6
+        private const val RARE_PENALTY = 12
+        private val RARE = listOf("🏩")
         private val POPULAR = listOf(
             "❤️", "😂", "🥰", "😍", "😭", "🙏", "👍", "😊", "🔥", "😘", "🥺", "✨",
             "😁", "🤣", "💕", "😢", "😅", "👌", "🎉", "💯", "😡", "🤔", "😎", "🙂",
         )
+
+        /**
+         * Loose key to look a Malayalam reading up with. While typing "chir" the engine says ചിർ,
+         * so the end mark is dropped to still find ചിരി. A word ending in ം (പുച്ഛം, സ്നേഹം) is
+         * already whole: keep its end, or പുച്ഛം would also match പൂച്ചമുഖം (cat face).
+         */
+        private fun searchKey(word: String): String =
+            if (word.endsWith(ANUSWARAM)) loose(word) else loose(word).trimEnd(VIRAMA)
 
         /** Loose spelling, see [MalayalamSuggester.looseKey] ("hrudayam" ഹ്രുദയം = ഹൃദയം). */
         private fun loose(word: String) = MalayalamSuggester.looseKey(word)

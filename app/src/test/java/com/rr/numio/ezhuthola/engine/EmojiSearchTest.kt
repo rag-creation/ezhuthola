@@ -74,4 +74,27 @@ class EmojiSearchTest {
         assertEquals(emptyList(), find("   "))
         assertEquals(emptyList(), find("zzqxj"))
     }
+
+    /** The Malayalam shown under the search box. */
+    private fun reading(query: String) = search.bestReading(query, suggester.suggest(query).words)
+
+    @Test fun readingOnlyForRealMalayalam() {
+        assertEquals("ചിരി", reading("chiri"))
+        assertEquals(null, reading("love"), "English word: no made-up Malayalam")
+        assertEquals(null, reading("angry"), "English word: no made-up Malayalam")
+        assertEquals(null, reading("happy"), "English word: no made-up Malayalam")
+    }
+
+    @Test fun wholeWordsDontMatchLongerWords() {
+        // പുച്ഛം (contempt) used to also match പൂച്ചമുഖം (cat face).
+        assertFirst("😏", "puchcham", within = 2)
+        assertTrue(find("puchcham").none { it in listOf("😽", "😸", "😾") }, "no cats for puchcham: ${find("puchcham")}")
+        assertFirst("❤️", "sneham", within = 3)
+        assertFirst("😂", "chir", within = 3)   // half-typed still works
+    }
+
+    @Test fun loveIsAboutHearts() {
+        assertTrue("🏩" !in find("love").take(8), "love hotel shouldn't crowd out the hearts")
+        assertTrue(find("love hotel").firstOrNull() == "🏩", "but it's still there when you ask for it")
+    }
 }

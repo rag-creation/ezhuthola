@@ -530,7 +530,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
         val emojis = search.search(query, ::read)
         val last = query.trim().substringAfterLast(' ')
-        val reading = if (last.length >= 2) read(last).firstOrNull() else null
+        // Only show a reading that really matched a Malayalam emoji word ("chiri" → ചിരി),
+        // never a guess for an English word ("love" → ലോവെ).
+        val reading = if (last.length >= 2) search.bestReading(last, read(last)) else null
         return EmojiResults(emojis, reading)
     }
 
