@@ -21,8 +21,9 @@ android {
 
     buildTypes {
         release {
+            // R8: shrinks unused library code (about 11 MB → a few MB) and starts faster
             optimization {
-                enable = false
+                enable = true
             }
         }
     }
