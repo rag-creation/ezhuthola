@@ -1,0 +1,6 @@
+# Ezhuthola's quiet words (GPL-3.0, part of Ezhuthola).
+# Swear words and other words that are fine to type but should never pop up by themselves.
+# They are left exactly as typed (never "corrected"), but never shown as suggestions,
+# so typing "my" never offers anything from this list. One word per line.
+myre
+myree

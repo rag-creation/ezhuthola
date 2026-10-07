@@ -170,9 +170,13 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             }
             suggester = MalayalamSuggester(MalayalamEngine(rules), words, userWords = ml)
             // Ezhuthola's own chat words (bro, tbh, ngl) are merged into the subtitle list.
-            val enExtra = assets.open("en_extra_words.tsv").bufferedReader().use { it.readLines() }
+            // Manglish chat words (machane, kazhicho, vave) join them: never corrected, suggested.
+            val enExtra = assets.open("en_extra_words.tsv").bufferedReader().use { it.readLines() } +
+                assets.open("en_manglish_words.tsv").bufferedReader().use { it.readLines() }
             // Real but rare words: left as typed and kept off Missing words, never suggested.
-            val enKnown = assets.open("en_known_words.txt").bufferedReader().use { it.readLines() }
+            // Quiet words (swear words like myre) are treated the same: typed fine, never offered.
+            val enKnown = assets.open("en_known_words.txt").bufferedReader().use { it.readLines() } +
+                assets.open("en_quiet_words.txt").bufferedReader().use { it.readLines() }
             english = assets.open("en_words.tsv").bufferedReader().useLines {
                 // Manglish like "poda" or "adipoli" is never "corrected" into English.
                 EnglishSuggester.fromTsv(

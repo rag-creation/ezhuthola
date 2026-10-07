@@ -1,0 +1,143 @@
+# Ezhuthola's own Manglish chat words (GPL-3.0, part of Ezhuthola).
+# Malayalam typed in English letters, the way people write it in chats.
+# In English mode these are never "corrected" (machane stays machane, not machine)
+# and they show as suggestions while typing. Common spellings of the same word are all listed.
+# Format: word<TAB>count, merged like en_extra_words.tsv.
+# Counts: 15000 = everyday chat, 3000 = everything else. Both keep the word safe from autocorrect.
+
+# ---- Everyday chat ----
+njan	15000
+ente	15000
+ninte	15000
+enikk	15000
+enikku	15000
+ninakk	15000
+ninakku	15000
+vaa	15000
+povam	15000
+pokam	15000
+poyi	15000
+varunnu	15000
+verunnu	15000
+kazhicho	15000
+kalicho	15000
+kudicho	15000
+machane	15000
+vishesham	15000
+visesham	15000
+amma	15000
+achan	15000
+chettan	15000
+chechi	15000
+
+# ---- Family and people ----
+vaapa	3000
+vappa	3000
+umma	3000
+acchan	3000
+ammavan	3000
+ammayi	3000
+aliyan	3000
+kunju	3000
+kunjhu	3000
+kutty	3000
+kutti	3000
+midukki	3000
+mandan	3000
+manushyan	3000
+
+# ---- Sweet talk ----
+vave	3000
+vaave	3000
+panchare	3000
+panjare	3000
+thene	3000
+theney	3000
+muthe	3000
+muthey	3000
+ponnu	3000
+ponne	3000
+ishttayi	3000
+ishtayi	3000
+ishtaayi	3000
+sneham	3000
+romancham	3000
+
+# ---- Talk and reactions ----
+od	3000
+odu	3000
+pokko	3000
+povanda	3000
+nikk	3000
+nikku	3000
+chaaveda	3000
+chaavada	3000
+maduthu	3000
+deshyam	3000
+dheshyam	3000
+shardhikkan	3000
+chardhikkan	3000
+kulikkan	3000
+thinnan	3000
+paadan	3000
+paatt	3000
+paattu	3000
+kelkkan	3000
+kellkan	3000
+kelkan	3000
+samsarikkam	3000
+mindanda	3000
+pinakkam	3000
+chorichil	3000
+pucham	3000
+kilukkam	3000
+sandesham	3000
+ariyathe	3000
+varathath	3000
+varuthu	3000
+poruthu	3000
+porichu	3000
+pollichath	3000
+polichath	3000
+aane	3000
+aanu	3000
+cheli	3000
+chali	3000
+
+# ---- Places and things ----
+kinattin	3000
+karayil	3000
+aanavandi	3000
+viplavam	3000
+chentharakam	3000
+nakshathram	3000
+dhruva	3000
+megham	3000
+chithram	3000
+viriyunna	3000
+kaalel	3000
+kayyil	3000
+kaiyil	3000
+kannil	3000
+nakham	3000
+nenju	3000
+nenjil	3000
+cherth	3000
+cherthu	3000
+eenam	3000
+
+# ---- Food ----
+aracha	3000
+meen	3000
+mathanga	3000
+kumbalanga	3000
+thavi	3000
+kadala	3000
+putt	3000
+puttu	3000
+aviyal	3000
+sambar	3000
+sambhar	3000
+thyru	3000
+thairu	3000
+thayiru	3000
