@@ -25,6 +25,8 @@ class EnglishSuggester(
     private val used: UserWords = UserWords(),
     /** Real but rare words: never suggested, only kept from being "corrected" or listed as missing. */
     private val known: Set<String> = emptySet(),
+    /** How names are written, by their plain lowercase form: "bbc" → BBC, "fdroid" → F-Droid. */
+    private val display: Map<String, String> = emptyMap(),
 ) {
     private val rankOf = HashMap<String, Int>(words.size * 2).apply {
         words.forEachIndexed { i, w -> putIfAbsent(w, i) }
@@ -94,7 +96,10 @@ class EnglishSuggester(
         corrections.forEach { shown += it.word }
         val chips = shown.filter { it != lower }.take(maxShown).map { matchCase(it, typed) }
 
-        val best = auto?.let { matchCase(it.word, typed) } ?: typed
+        // A name typed in small letters gets its own spelling: "bbc" → BBC, "github" → GitHub.
+        val best = auto?.let { matchCase(it.word, typed) }
+            ?: display[lower]?.takeIf { lower !in userWords }?.let { matchCase(lower, typed) } // undone once: kept
+            ?: typed
         return Suggestions(typed = typed, best = best, words = chips)
     }
 
@@ -175,7 +180,8 @@ class EnglishSuggester(
 
     /** Keep the user's capitals: "Tomo" → "Tomorrow", "TOMO" → "TOMORROW". "i" words → "I". */
     private fun matchCase(word: String, typed: String): String = when {
-        typed.length > 1 && typed.all { !it.isLetter() || it.isUpperCase() } -> word.uppercase()
+        typed.length > 1 && typed.all { !it.isLetter() || it.isUpperCase() } -> (display[word] ?: word).uppercase()
+        word in display -> display.getValue(word)
         typed[0].isUpperCase() -> word.replaceFirstChar { it.uppercaseChar() }
         word == "i" || word.startsWith("i'") -> word.replaceFirstChar { it.uppercaseChar() }
         else -> word
@@ -210,8 +216,12 @@ class EnglishSuggester(
                 counts.putIfAbsent(word, count)
             }
             var merged = false
+            val display = HashMap<String, String>()
             for (line in extra) {
-                val (word, count) = parse(line) ?: continue
+                // Names keep how they're written: "F-Droid" is stored as fdroid, shown as F-Droid.
+                val written = line.substringBefore('\t').trim()
+                val (word, count) = parse(line.replace("-", "")) ?: continue
+                if (written.isNotEmpty() && written != word) display[word] = written
                 if (count > (counts[word] ?: 0L)) {
                     counts[word] = count
                     merged = true
@@ -226,7 +236,8 @@ class EnglishSuggester(
                 if (w.isNotEmpty() && !w.startsWith("#")) knownWords += w.lowercase()
             }
             return EnglishSuggester(
-                ordered, isManglish = isManglish, userWords = userWords, used = used, known = knownWords
+                ordered, isManglish = isManglish, userWords = userWords, used = used, known = knownWords,
+                display = display,
             )
         }
 

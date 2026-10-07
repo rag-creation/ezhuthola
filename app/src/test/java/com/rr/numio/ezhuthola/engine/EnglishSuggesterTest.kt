@@ -160,4 +160,17 @@ class EnglishSuggesterTest {
         assertEquals("finally", withKnown.suggest("finaly").best)
         assertEquals("friend", withKnown.suggest("freind").best)
     }
+
+    @Test fun namesKeepTheirSpelling() {
+        val en = chatEnglish()
+        assertEquals("BBC", en.suggest("bbc").best)
+        assertEquals("GitHub", en.suggest("github").best)
+        assertEquals("F-Droid", en.suggest("fdroid").best)
+        assertEquals("Numio", en.suggest("Numio").best)
+        assertEquals("YOUTUBE", en.suggest("YOUTUBE").best)
+        assertTrue("F-Droid" in en.suggest("fdr").words)
+        assertTrue("GitLab" in en.suggest("gitl").words)
+        assertTrue(en.knows("fdroid"))
+        assertEquals("fever", en.suggest("fever").best)
+    }
 }

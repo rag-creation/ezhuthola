@@ -2,6 +2,7 @@
 # The subtitle word list (FrequencyWords) comes from movies, so chat words are missing or buried:
 # "tbh" and "ngl" aren't there at all, and "bro" ranks below "brother", "bring" and "break".
 # Format: word<TAB>count. A word already in the main list keeps whichever count is higher.
+# Names are written the way they're spelled (BBC, GitHub, F-Droid); typing them in small letters gives that.
 # Counts are made up in three tiers: 200000 = everyday chat, 50000 = common, 15000 = less common.
 
 # ---- Everyday chat ----
@@ -60,11 +61,11 @@ yaar	50000
 bhai	50000
 
 # ---- Apps and phone words ----
-whatsapp	50000
+WhatsApp	50000
 insta	50000
-instagram	50000
-youtube	50000
-google	50000
+Instagram	50000
+YouTube	50000
+Google	50000
 wifi	50000
 emoji	50000
 emojis	50000
@@ -85,49 +86,49 @@ msgs	15000
 txt	15000
 screenshot	50000
 screenshots	50000
-otp	50000
-qr	50000
-pdf	50000
+OTP	50000
+QR	50000
+PDF	50000
 notifications	50000
 logout	15000
 signup	15000
 screenshare	15000
 unsubscribe	15000
-url	15000
-chatgpt	15000
+URL	15000
+ChatGPT	15000
 chatbot	15000
 vlogger	15000
 influencer	15000
 influencers	15000
 youtuber	15000
-tiktok	15000
-spotify	15000
-gmail	15000
-github	15000
-airdrop	15000
+TikTok	15000
+Spotify	15000
+Gmail	15000
+GitHub	15000
+AirDrop	15000
 smartwatch	15000
 earbuds	15000
-airpods	15000
+AirPods	15000
 powerbank	15000
 livestream	15000
 streamer	15000
 hashtags	15000
 unfollow	15000
 podcasts	15000
-upi	15000
-gpay	15000
-paytm	15000
-phonepe	15000
-flipkart	15000
-zomato	15000
-swiggy	15000
-talabat	15000
-careem	15000
-samsung	15000
-xiaomi	15000
-oneplus	15000
-macbook	15000
-covid	15000
+UPI	15000
+GPay	15000
+Paytm	15000
+PhonePe	15000
+Flipkart	15000
+Zomato	15000
+Swiggy	15000
+Talabat	15000
+Careem	15000
+Samsung	15000
+Xiaomi	15000
+OnePlus	15000
+MacBook	15000
+Covid	15000
 coronavirus	15000
 
 # ---- Less common ----
@@ -158,43 +159,60 @@ slay	15000
 bhaiya	15000
 
 # ---- Places, festivals and food (Kerala and the UAE) ----
-kerala	15000
-malayali	15000
-mallu	15000
-onam	15000
-vishu	15000
-kochi	15000
-thrissur	15000
-calicut	15000
-trivandrum	15000
-uae	15000
-dubai	15000
-sharjah	15000
-ajman	15000
-dhabi	15000
+Kerala	15000
+Malayali	15000
+Mallu	15000
+Onam	15000
+Vishu	15000
+Kochi	15000
+Thrissur	15000
+Calicut	15000
+Trivandrum	15000
+UAE	15000
+Dubai	15000
+Sharjah	15000
+Ajman	15000
+Dhabi	15000
 biryani	15000
 shawarma	15000
 karak	15000
 chai	15000
-emirates	15000
-fujairah	15000
-khaimah	15000
-bengaluru	15000
-kozhikode	15000
-kannur	15000
-malappuram	15000
-palakkad	15000
+Emirates	15000
+Fujairah	15000
+Khaimah	15000
+Bengaluru	15000
+Kozhikode	15000
+Kannur	15000
+Malappuram	15000
+Palakkad	15000
 kollam	15000
-alappuzha	15000
-kottayam	15000
-idukki	15000
-wayanad	15000
-kasaragod	15000
-pathanamthitta	15000
-ernakulam	15000
-thiruvananthapuram	15000
+Alappuzha	15000
+Kottayam	15000
+Idukki	15000
+Wayanad	15000
+Kasaragod	15000
+Pathanamthitta	15000
+Ernakulam	15000
+Thiruvananthapuram	15000
 sadhya	15000
 payasam	15000
 porotta	15000
 parotta	15000
 idli	15000
+
+# ---- Names, written the way they're spelled (typing "bbc" gives BBC) ----
+AI	50000
+Numio	15000
+Ezhuthola	15000
+F-Droid	15000
+GitLab	15000
+Obtainium	15000
+Claude	15000
+OpenAI	15000
+Gemini	15000
+Reddit	15000
+Tuta	15000
+BBC	15000
+CNN	15000
+Reuters	15000
+Jazeera	15000
