@@ -1,0 +1,6 @@
+- Manglish chat words like machane, kazhicho and vave are no longer corrected and now show as suggestions
+- Manglish words no longer get English look-alikes in the suggestion strip
+- Rare English words are left as typed
+- Tap back into a typed word to see corrections for it
+- Names keep their spelling: KSRTC, GitHub, F-Droid
+- More Kerala and UAE place names and Malayalam food words
