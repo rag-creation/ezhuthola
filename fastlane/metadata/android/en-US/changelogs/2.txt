@@ -1,6 +1,8 @@
-- Manglish chat words like machane, kazhicho and vave are no longer corrected and now show as suggestions
-- Manglish words no longer get English look-alikes in the suggestion strip
+- Five new themes: Bloom, Bloom Red, Cosmic Latte, Sage and Pocket Atlas
+- Themes change at once, even with the keyboard open
+- Manglish chat words like machane and kazhicho are no longer corrected and show as suggestions
+- No English look-alikes for Manglish words
 - Rare English words are left as typed
-- Tap back into a typed word to see corrections for it
+- Tap back into a word to see corrections for it
 - Names keep their spelling: KSRTC, GitHub, F-Droid
-- More Kerala and UAE place names and Malayalam food words
+- More Kerala and UAE places and Malayalam food words
