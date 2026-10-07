@@ -138,12 +138,23 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     /** Password, email and web-address fields always get plain English. */
     private var plainField = false
 
+    /**
+     * A theme picked in the app screen shows at once, even while the keyboard is open
+     * (the "Try it" box). Kept in a field: Android only holds listeners weakly.
+     */
+    private val lookListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM) {
+            mainHandler.post { applySettings() }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         savedStateController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         malayalam = prefs.getBoolean(KeyboardSettings.MALAYALAM, false) // open in the mode you left it
         clipboard.addPrimaryClipChangedListener(clipListener)
+        prefs.registerOnSharedPreferenceChangeListener(lookListener)
 
         Thread {
             val pinned = File(filesDir, CLIPS_FILE)
@@ -278,6 +289,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     override fun onDestroy() {
         super.onDestroy()
         clipboard.removePrimaryClipChangedListener(clipListener)
+        prefs.unregisterOnSharedPreferenceChangeListener(lookListener)
         saveUserWords()
         fileWriter.shutdown() // writes already queued still finish
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
