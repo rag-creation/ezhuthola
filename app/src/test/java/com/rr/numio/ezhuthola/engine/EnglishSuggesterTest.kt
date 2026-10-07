@@ -67,6 +67,35 @@ class EnglishSuggesterTest {
         assertEquals("acha", best("acha"))   // short words: only swapped letters get fixed
     }
 
+    @Test fun manglishGetsNoEnglishLookAlikes() {
+        val guarded = EnglishSuggester.fromTsv(
+            javaClass.getResource("/en_words.tsv")!!.readText().lineSequence(),
+            isManglish = { it == "visesham" }
+        )
+        val s = guarded.suggest("visesham")
+        assertEquals("visesham", s.best)
+        assertTrue(s.words.none { it == "bisexual" })
+    }
+
+    @Test fun manglishWordsStayAndAreSuggested() {
+        val withManglish = EnglishSuggester.fromTsv(
+            javaClass.getResource("/en_words.tsv")!!.readText().lineSequence(),
+            extra = sequenceOf("machane\t15000", "kazhicho\t15000")
+        )
+        assertEquals("machane", withManglish.suggest("machane").best)
+        assertTrue("kazhicho" in withManglish.suggest("kazhi").words)
+    }
+
+    @Test fun quietWordsAreKeptButNeverOffered() {
+        val quiet = EnglishSuggester.fromTsv(
+            javaClass.getResource("/en_words.tsv")!!.readText().lineSequence(),
+            known = sequenceOf("myre")
+        )
+        assertEquals("myre", quiet.suggest("myre").best)
+        assertTrue(quiet.suggest("my").words.none { it == "myre" })
+        assertTrue(quiet.suggest("myr").words.none { it == "myre" })
+    }
+
     @Test fun correctionShownInStrip() {
         assertEquals("setting", words("setteng").first())
     }

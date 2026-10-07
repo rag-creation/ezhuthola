@@ -53,14 +53,16 @@ class EnglishSuggester(
         val rank = rankOf[lower] ?: if (isKnown(lower)) words.size else null
         val commonWord = (rank != null && rank < COMMON) || lower in userWords || used.count(lower) >= 2
 
-        // 1. Typo corrections. Common words are never touched ("form" stays form).
-        val corrections = if (commonWord || lower.length < 3) emptyList() else corrections(lower)
+        // 1. Typo corrections. Common words are never touched ("form" stays form), and
+        // Manglish gets no English look-alikes in the strip ("visesham" never offers bisexual).
+        val corrections = if (commonWord || lower.length < 3 || isManglish(lower)) emptyList()
+        else corrections(lower)
         val auto = corrections.firstOrNull()?.takeIf { c ->
             val closeEnough = if (lower.length >= 6) c.cost <= 2
             else c.cost <= 1 && sameLetters(lower, c.word) // short: swaps only
             // A rare word the list does know ("realy") is kept unless the fix is far more likely.
             val beatsTyped = rank == null || c.score < score(0, rank)
-            closeEnough && beatsTyped && !isManglish(lower)
+            closeEnough && beatsTyped
         }
 
         // 2. Completions: the list is sorted by how common each word is, so first matches are best.
