@@ -556,11 +556,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             photo = null
         }
         // The strip under the keys (behind Android's navigation bar) matches the theme,
-        // and the ∨ / gesture bar turns dark on the Light theme so it stays visible.
+        // and the ∨ / gesture bar turns dark on light themes so it stays visible.
         keyboardRoot?.setBackgroundColor(theme.background.toArgb())
         window?.window?.let { w ->
             WindowCompat.getInsetsController(w, w.decorView).isAppearanceLightNavigationBars =
-                theme.id == Themes.Light.id
+                theme.isLight
         }
     }
 

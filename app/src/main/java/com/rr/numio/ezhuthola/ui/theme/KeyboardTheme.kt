@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import java.io.File
 
 /**
@@ -27,7 +28,13 @@ data class KeyboardTheme(
     val inkOnAccent: Color,
     val card: Color,          // clipboard cards etc.
     val usesPhoto: Boolean = false,
-)
+    /** Backspace in its own colour (Bloom's red key); null = like the other special keys. */
+    val deleteKey: Color? = null,
+    val deleteInk: Color? = null,
+) {
+    /** Light enough for dark system icons (Light, Cosmic Latte, Sage, Pocket Atlas). */
+    val isLight: Boolean get() = !usesPhoto && background.luminance() > 0.3f
+}
 
 object Themes {
     val Numio = KeyboardTheme(
@@ -54,6 +61,41 @@ object Themes {
         keyText = Color(0xFFEEF3F8), hint = Color(0xFF8A9AAE),
         accent = Color(0xFF4FA8F7), inkOnAccent = Color(0xFF0B1520), card = Color(0xFF18202A)
     )
+    // Palette themes, shared with Clock by Numio (same names in both apps).
+    val Bloom = KeyboardTheme(
+        id = "bloom", name = "Bloom", subtitle = "Navy & cobalt",
+        background = Color(0xFF021861), key = Color(0xFF0F2C80), specialKey = Color(0xFF082069),
+        keyText = Color(0xFFF4F1EA), hint = Color(0xFF93A6DC),
+        accent = Color(0xFF4A7DE6), inkOnAccent = Color(0xFFFFFFFF), card = Color(0xFF0B2775),
+        deleteKey = Color(0xFFDE1110), deleteInk = Color(0xFFFFFFFF)
+    )
+    val BloomRed = KeyboardTheme(
+        id = "bloomred", name = "Bloom Red", subtitle = "Red & navy",
+        background = Color(0xFFDE1110), key = Color(0xFFB80E0D), specialKey = Color(0xFF8E0A0A),
+        keyText = Color(0xFFFFF6F2), hint = Color(0xFFFFD7D1),
+        accent = Color(0xFF021861), inkOnAccent = Color(0xFFFFFFFF), card = Color(0xFFB80E0D),
+        deleteKey = Color(0xFF021861), deleteInk = Color(0xFFFFFFFF)
+    )
+    val Latte = KeyboardTheme(
+        id = "latte", name = "Cosmic Latte", subtitle = "Cream & burgundy",
+        background = Color(0xFFE8DCC6), key = Color(0xFFFBF6EC), specialKey = Color(0xFFB7A89A),
+        keyText = Color(0xFF3B1C21), hint = Color(0xFF6E5D50),
+        accent = Color(0xFF722F37), inkOnAccent = Color(0xFFFBF6EC), card = Color(0xFFFBF6EC),
+        deleteKey = Color(0xFF722F37), deleteInk = Color(0xFFFBF6EC)
+    )
+    val Sage = KeyboardTheme(
+        id = "sage", name = "Sage", subtitle = "Green & amber",
+        background = Color(0xFF9CAF88), key = Color(0xFFF4F6F0), specialKey = Color(0xFFA7A7A7),
+        keyText = Color(0xFF1F2A1A), hint = Color(0xFF33402B),
+        accent = Color(0xFFA34500), inkOnAccent = Color(0xFFFFF4EA), card = Color(0xFFF4F6F0)
+    )
+    val Atlas = KeyboardTheme(
+        id = "atlas", name = "Pocket Atlas", subtitle = "Blue & yellow",
+        background = Color(0xFFB7D8F5), key = Color(0xFFFFFFFF), specialKey = Color(0xFFFFD700),
+        keyText = Color(0xFF1A2533), hint = Color(0xFF2F4A66),
+        accent = Color(0xFFD00500), inkOnAccent = Color(0xFFFFFFFF), card = Color(0xFFFFFFFF),
+        deleteKey = Color(0xFFE10600), deleteInk = Color(0xFFFFFFFF)
+    )
     /** Your own photo behind see-through keys. */
     val Photo = KeyboardTheme(
         id = "photo", name = "Your photo", subtitle = "Any picture",
@@ -63,7 +105,7 @@ object Themes {
         usesPhoto = true
     )
 
-    val all = listOf(Numio, BlackWhite, Light, BlueNight, Photo)
+    val all = listOf(Numio, BlackWhite, Light, BlueNight, Bloom, BloomRed, Latte, Sage, Atlas, Photo)
 
     fun byId(id: String?): KeyboardTheme = all.firstOrNull { it.id == id } ?: Numio
 }

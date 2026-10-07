@@ -302,9 +302,9 @@ private fun KeyboardContent(
             Key(
                 label = "",
                 modifier = Modifier.weight(1.5f),
-                color = SpecialKeyColor,
+                color = LocalKeyboardTheme.current.deleteKey ?: SpecialKeyColor,
                 repeat = true,
-                icon = { BackspaceIcon(KeyText) }
+                icon = { BackspaceIcon(LocalKeyboardTheme.current.deleteInk ?: KeyText) }
             ) { onBackspace() }
         }
 
@@ -552,7 +552,7 @@ private fun EmojiPanel(
     }
 
     val theme = LocalKeyboardTheme.current
-    val light = theme.id == Themes.Light.id
+    val light = theme.isLight
     val emojiTheme = if (light) android.R.style.Theme_DeviceDefault_Light else android.R.style.Theme_DeviceDefault
     val emojiBg = if (theme.usesPhoto) android.graphics.Color.TRANSPARENT else theme.background.toArgb()
 
