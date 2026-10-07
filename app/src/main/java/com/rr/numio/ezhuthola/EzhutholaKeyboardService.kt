@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.view.inputmethod.InputMethodManager
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.text.InputType
@@ -79,6 +80,19 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     /** Last English correction, so backspace can undo it: (setting, setteng). */
     private var undo: Pair<String, String>? = null
+
+    /** What is underlined right now (the typed word, or its Malayalam spelling). */
+    private var shown = ""
+
+    /**
+     * An English word the cursor was put into after it was typed ("yu|o"): its letters before
+     * and after the cursor, so a word tapped in the strip can replace it.
+     */
+    private var tapped: Pair<Int, Int>? = null
+    private val showWordAtCursor = Runnable { suggestForWordAtCursor() }
+
+    /** Right after a word is picked from the strip, don't offer suggestions for it again. */
+    private var quietUntil = 0L
 
     /** Loaded in the background at start-up; null for the first moment. */
     @Volatile private var suggester: MalayalamSuggester? = null
@@ -243,11 +257,15 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         if (!restarting) session++
         applySettings()
         undo = null
+        mainHandler.removeCallbacks(showWordAtCursor)
+        tapped = null
         resetWord()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        mainHandler.removeCallbacks(showWordAtCursor)
+        forgetTapped()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         commitWord()
         saveUserWords()
@@ -270,9 +288,67 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         val cursorLeftTheWord = newSelStart != newSelEnd || candidatesStart < 0 || newSelEnd != candidatesEnd
         if (word.isNotEmpty() && cursorLeftTheWord) {
-            currentInputConnection?.finishComposingText()
+            val ic = currentInputConnection
+            // Some apps drop the underline while you type, and "suggestion" would split into
+            // "sugges" + "tion". If the cursor is still right after the word, pick it back up.
+            if (newSelStart == newSelEnd && candidatesStart < 0 && shown.isNotEmpty() &&
+                ic != null && endsWithWord(ic.getTextBeforeCursor(shown.length + 1, 0), shown)
+            ) {
+                ic.setComposingRegion(newSelStart - shown.length, newSelStart)
+                return
+            }
+            ic?.finishComposingText()
             resetWord()
         }
+        // The cursor was moved into a word that's already typed: show suggestions for it.
+        // Waits a moment, so the steps of our own typing (word, then space) don't flash the strip.
+        mainHandler.removeCallbacks(showWordAtCursor)
+        if (word.isEmpty() && newSelStart == newSelEnd) mainHandler.postDelayed(showWordAtCursor, 150)
+        else forgetTapped()
+    }
+
+    private fun endsWithWord(before: CharSequence?, w: String): Boolean {
+        val b = before?.toString() ?: return false
+        return b.endsWith(w) && (b.length == w.length || !b[0].isLetter())
+    }
+
+    /** English only: the cursor sits in or right after a word like "yuo", so suggest "you". */
+    private fun suggestForWordAtCursor() {
+        if (word.isNotEmpty() || malayalam || plainField || passwordField) return
+        if (SystemClock.uptimeMillis() < quietUntil) return
+        val en = english ?: return
+        val ic = currentInputConnection ?: return
+        val left = ic.getTextBeforeCursor(MAX_WORD, 0)?.toString().orEmpty().takeLastWhile(::isWordChar)
+        val right = ic.getTextAfterCursor(MAX_WORD, 0)?.toString().orEmpty().takeWhile(::isWordChar)
+        val whole = left + right
+        if (left.isEmpty() || whole.length < 2 || !whole.any { it.isAsciiLetter() }) {
+            forgetTapped()
+            return
+        }
+        tapped = left.length to right.length
+        suggestions = en.suggest(whole)
+    }
+
+    private fun forgetTapped() {
+        if (tapped != null) suggestions = null
+        tapped = null
+    }
+
+    private fun isWordChar(c: Char) = c.isAsciiLetter() || c == '\''
+
+    /**
+     * Typing a letter right after a word ("sugges|"): carry on with that word, so it is
+     * checked and suggested as one. Not in the middle of a word, and not in Malayalam.
+     */
+    private fun resumeWordBeforeCursor() {
+        if (malayalam) return
+        val ic = currentInputConnection ?: return
+        val after = ic.getTextAfterCursor(1, 0)?.toString().orEmpty()
+        if (after.isNotEmpty() && isWordChar(after[0])) return
+        val left = ic.getTextBeforeCursor(MAX_WORD, 0)?.toString().orEmpty().takeLastWhile(::isWordChar)
+        if (left.isEmpty() || left.length >= MAX_WORD || !left.any { it.isAsciiLetter() }) return
+        ic.deleteSurroundingText(left.length, 0)
+        word.append(left)
     }
 
     // ---- Keys --------------------------------------------------------------
@@ -290,9 +366,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     private fun onKeyText(text: String) {
         undo = null
+        forgetTapped()
         when {
             // A letter: add it to the word being typed (Manglish or English).
             !plainField && text.length == 1 && text[0].isAsciiLetter() -> {
+                if (word.isEmpty()) resumeWordBeforeCursor()
                 word.append(text)
                 refreshWord()
             }
@@ -310,6 +388,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     }
 
     private fun backspace() {
+        forgetTapped()
         if (word.isNotEmpty()) {
             word.deleteCharAt(word.lastIndex)
             if (word.isEmpty()) {
@@ -327,6 +406,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     }
 
     private fun enter() {
+        forgetTapped()
         commitWord()
         val ic = currentInputConnection ?: return
         val options = currentInputEditorInfo?.imeOptions ?: 0
@@ -348,6 +428,20 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     /** A word from the strip was tapped: type it plus a space. */
     private fun pick(chosen: String) {
         val ic = currentInputConnection ?: return
+        quietUntil = SystemClock.uptimeMillis() + 500
+        tapped?.let { (before, after) ->
+            // A word typed earlier ("yuo"): swap it in place, adding a space only at the end.
+            tapped = null
+            learn(chosen)
+            ic.beginBatchEdit()
+            ic.deleteSurroundingText(before, after)
+            ic.commitText(chosen, 1)
+            if (ic.getTextAfterCursor(1, 0).isNullOrEmpty()) ic.commitText(" ", 1)
+            ic.endBatchEdit()
+            suggestions = null
+            undo = null
+            return
+        }
         learn(chosen)
         ic.setComposingText(chosen, 1)
         ic.finishComposingText()
@@ -374,7 +468,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         suggestions = s
         // Malayalam shows the best spelling while typing; English shows exactly what was typed
         // (a correction is only swapped in when the word is finished).
-        currentInputConnection?.setComposingText(if (malayalam) s.best else typed, 1)
+        shown = if (malayalam) s.best else typed
+        currentInputConnection?.setComposingText(shown, 1)
     }
 
     /** Make the underlined word permanent (space, punctuation, enter, switching mode). */
@@ -595,6 +690,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     private fun resetWord() {
         word.clear()
+        shown = ""
         suggestions = null
     }
 
@@ -656,6 +752,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     }
 
     private companion object {
+        /** Longest word picked back up or suggested for after the cursor moves. */
+        const val MAX_WORD = 30
         const val ML_USER_FILE = "user_words_ml.tsv"
         const val CLIPS_FILE = "pinned_clips.txt"
     }
