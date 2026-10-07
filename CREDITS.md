@@ -24,7 +24,32 @@ These adapted lists are shared under **CC BY-SA 4.0**, as the license requires.
 subtitle list is missing, like place names (കേരളം, തൃശ്ശൂർ, ദുബായ്) and festivals.
 
 `app/src/main/assets/en_extra_words.tsv` is Ezhuthola's own list (GPL-3.0) of English chat words
-that movie subtitles miss or rank too low, like bro, tbh, ngl and lmao.
+that movie subtitles miss or rank too low, like bro, tbh, ngl and lmao, plus app and phone words
+(screenshot, otp, upi) and Kerala and UAE place names.
+
+## English spelling list
+
+**English Speller Database (ESDB, formerly SCOWL)** by **Kevin Atkinson**
+- Copyright 2000-2026 by Kevin Atkinson
+- License: MIT-like, see [licenses/ESDB-SCOWL.txt](licenses/ESDB-SCOWL.txt)
+- Source: https://github.com/en-wl/wordlist
+- Used for: knowing that rare English words are real, so they are not autocorrected or listed as missing words
+
+`app/src/main/assets/en_known_words.txt` is a word list made from ESDB:
+`./scowl word-list 60 A,B,Z 1 --deaccent --wo-poses=abbr --categories=`, lowercased, keeping only
+plain words (no possessives) that are not already in `en_words.tsv`. These words are never suggested.
+
+```
+Copyright 2000-2026 by Kevin Atkinson
+
+Permission to use, copy, modify, distribute, and sell any part of the English
+Speller Database (ESDB, previously known as SCOWLv2), or word lists
+created from it, is hereby granted without fee, provided that the above
+copyright notice appears in all copies and that both the above copyright
+notice and this notice appear in supporting documentation.  Kevin Atkinson
+makes no representations about the suitability of this database for any
+purpose.  It is provided "as is" without express or implied warranty.
+```
 
 ## Emoji search
 

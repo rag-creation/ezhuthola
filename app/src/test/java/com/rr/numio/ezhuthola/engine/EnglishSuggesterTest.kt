@@ -130,4 +130,34 @@ class EnglishSuggesterTest {
         taught.learn("arun")
         assertTrue(en.knows("arun"))
     }
+
+    private val withKnown by lazy {
+        EnglishSuggester.fromTsv(
+            javaClass.getResource("/en_words.tsv")!!.readText().lineSequence(),
+            known = javaClass.getResource("/en_known_words.txt")!!.readText().lineSequence(),
+        )
+    }
+
+    @Test fun rareRealWordsAreLeftAlone() {
+        assertTrue(!english.knows("filch"))
+        assertTrue(withKnown.knows("filch"))
+        assertTrue(withKnown.knows("Thoraxes"))
+        assertTrue(withKnown.knows("brother's"))
+        assertEquals("primly", withKnown.suggest("primly").best)
+        assertEquals("filch", withKnown.suggest("filch").best)
+    }
+
+    @Test fun rareRealWordsAreNotSuggested() {
+        assertTrue("primly" !in withKnown.suggest("prim").words)
+        assertTrue("filch" !in withKnown.suggest("filc").words)
+    }
+
+    @Test fun typosAreStillFixedWithTheSpellingList() {
+        assertEquals("the", withKnown.suggest("teh").best)
+        assertEquals("setting", withKnown.suggest("setteng").best)
+        assertEquals("receive", withKnown.suggest("recieve").best)
+        assertEquals("definitely", withKnown.suggest("definately").best)
+        assertEquals("finally", withKnown.suggest("finaly").best)
+        assertEquals("friend", withKnown.suggest("freind").best)
+    }
 }

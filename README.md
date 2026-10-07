@@ -102,6 +102,7 @@ Full details are in [CREDITS.md](CREDITS.md); full licence texts are in the [lic
 | What | By | Licence | Used for |
 |---|---|---|---|
 | [FrequencyWords](https://github.com/hermitdave/FrequencyWords) (from [OpenSubtitles](https://www.opensubtitles.org/), 2018) | Hermit Dave | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | Malayalam and English word frequencies: `ml_words.tsv`, `en_words.tsv` (adapted, so also CC BY-SA 4.0) |
+| [ESDB / SCOWL](https://github.com/en-wl/wordlist) (size 60, American and British) | Kevin Atkinson | [ESDB licence](licenses/ESDB-SCOWL.txt) (MIT-like) | Spelling list: rare real English words are left alone, not "corrected": `en_known_words.txt` |
 | [Unicode CLDR](https://github.com/unicode-org/cldr-json) annotations (CLDR 48, English and Malayalam) | Unicode, Inc. | [Unicode License v3](licenses/Unicode-License-v3.txt) | Emoji names and search keywords |
 | [Unicode Emoji](https://github.com/unicode-org/unicodetools) `emoji-test.txt` (Emoji 17.0) | Unicode, Inc. | [Unicode License v3](licenses/Unicode-License-v3.txt) | Emoji list and order: `emoji_keywords.tsv` |
 | [AndroidX](https://developer.android.com/jetpack/androidx) (Jetpack Compose, Material 3, Core, Lifecycle, Activity, Emoji2 Emoji Picker) | Google / The Android Open Source Project | [Apache 2.0](licenses/Apache-2.0.txt) | App and keyboard UI |
@@ -110,7 +111,7 @@ Ezhuthola's own work, under **GPL-3.0**:
 
 - `ezhuthola_rules.json` — the Manglish → Malayalam transliteration rules
 - `ml_extra_words.tsv` — common words the subtitle list misses, like place names (കേരളം, തൃശ്ശൂർ, ദുബായ്) and festivals
-- `en_extra_words.tsv` — English chat words (bro, tbh, ngl…)
+- `en_extra_words.tsv` — English chat words (bro, tbh, ngl…), app and phone words, and Kerala and UAE places
 - `emoji_manglish.tsv` — Manglish emoji search words (pwoli, umma…)
 
 Emoji images are drawn by your phone's own emoji font; none are bundled in the app.

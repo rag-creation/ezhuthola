@@ -157,11 +157,13 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             suggester = MalayalamSuggester(MalayalamEngine(rules), words, userWords = ml)
             // Ezhuthola's own chat words (bro, tbh, ngl) are merged into the subtitle list.
             val enExtra = assets.open("en_extra_words.tsv").bufferedReader().use { it.readLines() }
+            // Real but rare words: left as typed and kept off Missing words, never suggested.
+            val enKnown = assets.open("en_known_words.txt").bufferedReader().use { it.readLines() }
             english = assets.open("en_words.tsv").bufferedReader().useLines {
                 // Manglish like "poda" or "adipoli" is never "corrected" into English.
                 EnglishSuggester.fromTsv(
                     it, isManglish = ::isManglish, userWords = en,
-                    extra = enExtra.asSequence(), used = used
+                    extra = enExtra.asSequence(), used = used, known = enKnown.asSequence()
                 )
             }
             emojiSearch = loadEmojiSearch()

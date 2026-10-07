@@ -7,6 +7,8 @@ package com.rr.numio.ezhuthola.engine
  * Words come from en_words.tsv ("word<TAB>count", most common first).
  * Data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles.
  * Ezhuthola's own en_extra_words.tsv adds chat words the subtitles miss or bury (bro, tbh, ngl).
+ * en_known_words.txt (from ESDB/SCOWL by Kevin Atkinson) is a quiet spelling list: correct but
+ * rare words ("photosynthesis") are left alone and never go on Missing words, but are not suggested.
  *
  * [Suggestions.best] is what space types: what you typed if it is a real word,
  * otherwise a correction when there is a close one. The typed chip keeps your own word
@@ -21,6 +23,8 @@ class EnglishSuggester(
     private val userWords: UserWords = UserWords(),
     /** Known words this person types, with how often: they move up in completions ("br" → bro). */
     private val used: UserWords = UserWords(),
+    /** Real but rare words: never suggested, only kept from being "corrected" or listed as missing. */
+    private val known: Set<String> = emptySet(),
 ) {
     private val rankOf = HashMap<String, Int>(words.size * 2).apply {
         words.forEachIndexed { i, w -> putIfAbsent(w, i) }
@@ -32,13 +36,19 @@ class EnglishSuggester(
     /** True when the word is in the list or was taught. Anything else may be a missing word. */
     fun knows(word: String): Boolean {
         val lower = word.lowercase()
-        return lower in rankOf || lower in userWords
+        return lower in rankOf || lower in userWords || isKnown(lower)
     }
+
+    /** In the spelling list, or a possessive of a word that is ("photosynthesis's"). */
+    private fun isKnown(lower: String): Boolean =
+        lower in known || (lower.endsWith("'s") && lower.dropLast(2).let { it in known || it in rankOf })
 
     fun suggest(typed: String): Suggestions {
         if (typed.isEmpty()) return Suggestions("", "", emptyList())
         val lower = typed.lowercase()
-        val rank = rankOf[lower]
+        // A real word from the spelling list counts as the rarest listed word: it stays as
+        // typed unless a much more common word is one small slip away ("fro" → for).
+        val rank = rankOf[lower] ?: if (isKnown(lower)) words.size else null
         val commonWord = (rank != null && rank < COMMON) || lower in userWords || used.count(lower) >= 2
 
         // 1. Typo corrections. Common words are never touched ("form" stays form).
@@ -192,6 +202,7 @@ class EnglishSuggester(
             userWords: UserWords = UserWords(),
             extra: Sequence<String> = emptySequence(),
             used: UserWords = UserWords(),
+            known: Sequence<String> = emptySequence(),
         ): EnglishSuggester {
             val counts = LinkedHashMap<String, Long>()
             for (line in lines) {
@@ -209,7 +220,14 @@ class EnglishSuggester(
             // The main list is already in order; sortedBy is stable, so equal counts keep their place.
             val ordered = if (merged) counts.entries.sortedByDescending { it.value }.map { it.key }
             else counts.keys.toList()
-            return EnglishSuggester(ordered, isManglish = isManglish, userWords = userWords, used = used)
+            val knownWords = HashSet<String>()
+            for (line in known) {
+                val w = line.trim()
+                if (w.isNotEmpty() && !w.startsWith("#")) knownWords += w.lowercase()
+            }
+            return EnglishSuggester(
+                ordered, isManglish = isManglish, userWords = userWords, used = used, known = knownWords
+            )
         }
 
         private fun parse(line: String): Pair<String, Long>? {
