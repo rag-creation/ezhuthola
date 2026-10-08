@@ -15,6 +15,7 @@ import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethod
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -258,6 +259,19 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         keyboardRoot = keyboardView
         applySettings()
         return keyboardView
+    }
+
+    /**
+     * Some apps ask for the keyboard on their own when a screen opens, even when there is
+     * nothing to type into (no text box, so the field has no input type). Stay hidden then.
+     * A tap on a real text box is an explicit request and still opens the keyboard, and so
+     * does a terminal app (which also has no input type) when you tap into it.
+     */
+    override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
+        val askedByUser = (flags and (InputMethod.SHOW_EXPLICIT or InputMethod.SHOW_FORCED)) != 0
+        val info = currentInputEditorInfo
+        if (!askedByUser && (info == null || info.inputType == InputType.TYPE_NULL)) return false
+        return super.onShowInputRequested(flags, configChange)
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
