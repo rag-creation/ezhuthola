@@ -146,7 +146,8 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
 
     // ---- Parsing ------------------------------------------------------------
 
-    private fun parse(s: String): List<Seg> {
+    private fun parse(input: String): List<Seg> {
+        var s = input
         val out = mutableListOf<Seg>()
         var i = 0
         while (i < s.length) {
@@ -181,7 +182,13 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
                 continue
             }
 
-            // 4. Unknown: pass through
+            // 4. A capital the rules don't use (Q, B, K... with caps on): read it as lowercase.
+            if (s[i].isUpperCase()) {
+                s = s.substring(0, i) + s[i].lowercaseChar() + s.substring(i + 1)
+                continue
+            }
+
+            // 5. Unknown: pass through
             out += Seg.Other(s[i].toString())
             i++
         }

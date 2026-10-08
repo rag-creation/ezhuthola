@@ -76,6 +76,15 @@ class MalayalamEngineTest {
         assertTrue("പ്രേമ" in candidates("prema"))
     }
 
+    @Test fun qAndEi() {
+        assertEquals("ഖുവൈൻ", primary("quwein"))   // q → ഖ, ei → ൈ (Umm Al Quwain)
+        assertEquals("ഖുവൈൻ", primary("quwain"))
+        assertTrue("കുവൈൻ" in candidates("quwein")) // q → ക offered too
+        assertTrue(candidates("quwein").none { it.any { c -> c in 'a'..'z' } })
+        assertEquals("ഖുവൈൻ", primary("Quwein"))   // auto-capital
+        assertEquals("ബാസ്", primary("BAS"))       // caps on: B and S have no rule, read as b, s
+    }
+
     @Test fun primaryAlwaysFirst() {
         val r = engine.transliterate("paranju")
         assertEquals(r.primary, r.candidates.first())
