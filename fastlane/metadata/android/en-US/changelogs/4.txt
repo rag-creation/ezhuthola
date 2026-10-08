@@ -1,0 +1,3 @@
+- Malayalam: q now types ഖ and ei types ൈ (quwein → ഖുവൈൻ)
+- Capital letters in Malayalam mode no longer stay English
+- The keyboard no longer opens by itself when an app has no text box
