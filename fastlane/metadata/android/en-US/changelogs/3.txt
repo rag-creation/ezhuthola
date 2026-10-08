@@ -1,0 +1,2 @@
+- About screen now credits the ESDB/SCOWL spelling list
+- Release builds now match F-Droid's build (JDK 21)
