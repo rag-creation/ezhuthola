@@ -351,6 +351,7 @@ private fun Footer() {
         Spacer(Modifier.height(10.dp))
         Text(
             "Word data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles\n" +
+                "Spelling list: ESDB/SCOWL by Kevin Atkinson (MIT-like licence)\n" +
                 "Emoji names and keywords: Unicode CLDR and Unicode Emoji data " +
                 "© Unicode, Inc. (Unicode License v3)",
             color = TextDim.copy(alpha = 0.7f),
