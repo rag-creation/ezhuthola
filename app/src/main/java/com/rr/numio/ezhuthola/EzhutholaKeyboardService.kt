@@ -120,6 +120,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener { onCopied() }
     private val mainHandler = Handler(Looper.getMainLooper())
     private var history = ClipboardHistory()
+    /** The last clipboard text we looked at, so a clip you deleted isn't added again. */
+    private var lastClipText: String? = null
     private var clips by mutableStateOf<List<Clip>>(emptyList())
 
     /** Password fields: never save what's copied while typing there. */
@@ -215,7 +217,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     session = session,
                     startWithNumbers = startWithNumbers,
                     clips = clips,
-                    onOpenClipboard = { clips = history.all(now()) },
+                    onOpenClipboard = { captureClipboard(); clips = history.all(now()) },
                     onPasteClip = ::pasteClip,
                     onTogglePin = { history.togglePin(it); clips = history.all(now()); saveClips() },
                     onDeleteClip = { history.delete(it); clips = history.all(now()); saveClips() },
@@ -285,6 +287,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         // `restarting` = same field, the app just refreshed it: keep the current page.
         if (!restarting) session++
         applySettings()
+        captureClipboard()
         undo = null
         mainHandler.removeCallbacks(showWordAtCursor)
         tapped = null
@@ -603,16 +606,36 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     /** Something was copied. Save it, unless it's a password, an OTP, or history is off. */
     private fun onCopied() {
-        if (!prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true) || passwordField) return
-        val clip = try { clipboard.primaryClip } catch (e: SecurityException) { null } ?: return
-        // Password managers and OTP autofill mark their copies as sensitive (Android 13+).
-        if (clip.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE") == true) return
-        if (clip.itemCount == 0) return
-        val text = clip.getItemAt(0).coerceToText(this)?.toString()?.trim().orEmpty()
-        if (text.isEmpty()) return
-
+        val text = readClipboard() ?: return
+        lastClipText = text
         history.add(text, now())
         clips = history.all(now())
+    }
+
+    /**
+     * Android doesn't always tell a keyboard that something was copied (and Samsung may close
+     * the keyboard in the background, losing what it heard). So whenever the keyboard opens,
+     * or the clipboard panel does, look at the clipboard ourselves and add anything new.
+     */
+    private fun captureClipboard() {
+        val text = readClipboard() ?: return
+        if (text == lastClipText) return // already have it, or it was deleted on purpose
+        lastClipText = text
+        history.add(text, now())
+        clips = history.all(now())
+    }
+
+    /** The copied text, or null for nothing / passwords / OTPs / history switched off. */
+    private fun readClipboard(): String? {
+        if (!prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true) || passwordField) return null
+        val clip = try { clipboard.primaryClip } catch (e: Exception) { null } ?: return null
+        // Password managers and OTP autofill mark their copies as sensitive (Android 13+).
+        if (clip.description?.extras?.getBoolean("android.content.extra.IS_SENSITIVE") == true) return null
+        if (clip.itemCount == 0) return null
+        val text = try {
+            clip.getItemAt(0).coerceToText(this)?.toString()?.trim().orEmpty()
+        } catch (e: Exception) { "" }
+        return text.ifEmpty { null }
     }
 
     private fun pasteClip(text: String) {
