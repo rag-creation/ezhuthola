@@ -146,7 +146,8 @@ fun KeyboardLayout(
     theme: KeyboardTheme,
     photo: Bitmap?,                   // background for the "Your photo" theme
     photoDim: Float,                  // 0 = photo as-is, 1 = black
-    feedback: KeyFeedback
+    feedback: KeyFeedback,
+    clipboardOn: Boolean = true       // "Clipboard history" setting
 ) {
     CompositionLocalProvider(LocalKeyboardTheme provides theme, LocalKeyFeedback provides feedback) {
         Box(Modifier.fillMaxWidth()) {
@@ -165,7 +166,8 @@ fun KeyboardLayout(
                 malayalam, onToggleLanguage, suggestions, onPick, onText, onBackspace, onEnter,
                 session, startWithNumbers, clips, onOpenClipboard, onPasteClip, onTogglePin,
                 onDeleteClip, onClearClips, onOpenSettings, onSwitchKeyboard, searchEmoji,
-                transparent = theme.usesPhoto && photo != null
+                transparent = theme.usesPhoto && photo != null,
+                clipboardOn = clipboardOn
             )
         }
     }
@@ -191,7 +193,8 @@ private fun KeyboardContent(
     onOpenSettings: () -> Unit,
     onSwitchKeyboard: () -> Unit,
     searchEmoji: (String) -> EmojiResults,
-    transparent: Boolean
+    transparent: Boolean,
+    clipboardOn: Boolean = true
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -233,6 +236,7 @@ private fun KeyboardContent(
         if (clipboardOpen) {
             ClipboardPanel(
                 clips = clips,
+                clipboardOn = clipboardOn,
                 onPaste = { onPasteClip(it); clipboardOpen = false },
                 onTogglePin = onTogglePin,
                 onDelete = onDeleteClip,
@@ -1001,6 +1005,7 @@ private fun SettingsIcon(color: Color, modifier: Modifier) {
 @Composable
 private fun ClipboardPanel(
     clips: List<Clip>,
+    clipboardOn: Boolean,
     onPaste: (String) -> Unit,
     onTogglePin: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -1043,7 +1048,9 @@ private fun ClipboardPanel(
         if (clips.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "Text you copy shows up here.\nPasswords and OTPs are never saved.",
+                    // With history off nothing is saved, so say so instead of looking broken.
+                    text = if (clipboardOn) "Text you copy shows up here.\nPasswords and OTPs are never saved."
+                           else "Clipboard history is off.\nTurn it on in Ezhuthola settings (gear icon).",
                     color = HintText,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center

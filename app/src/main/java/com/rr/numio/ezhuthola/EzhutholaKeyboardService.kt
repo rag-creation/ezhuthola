@@ -122,6 +122,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var history = ClipboardHistory()
     /** The last clipboard text we looked at, so a clip you deleted isn't added again. */
     private var lastClipText: String? = null
+    private var clipboardOn by mutableStateOf(true)
     private var clips by mutableStateOf<List<Clip>>(emptyList())
 
     /** Password fields: never save what's copied while typing there. */
@@ -230,7 +231,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     theme = theme,
                     photo = photo,
                     photoDim = photoDim,
-                    feedback = feedback
+                    feedback = feedback,
+                    clipboardOn = clipboardOn
                 )
             }
         }
@@ -567,7 +569,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             vibrate = prefs.getBoolean(KeyboardSettings.VIBRATE, true),
             sound = prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)
         )
-        if (!prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)) {
+        clipboardOn = prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)
+        if (!clipboardOn) {
             history.clearUnpinned()
             clips = history.all(now())
         }
