@@ -1050,7 +1050,7 @@ private fun ClipboardPanel(
                 Text(
                     // With history off nothing is saved, so say so instead of looking broken.
                     text = if (clipboardOn) "Text you copy shows up here.\nPasswords and OTPs are never saved."
-                           else "Clipboard history is off.\nTurn it on in Ezhuthola settings (gear icon).",
+                           else "Clipboard history is off.\nTurn it on in settings (the button at top left).",
                     color = HintText,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center
