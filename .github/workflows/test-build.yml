@@ -26,6 +26,9 @@ jobs:
           # One annotation holding every error (GitHub shows at most 10 annotations per step).
           msg=$(grep -E "^e: |What went wrong" -A2 build.log | sed 's#file:///home/runner/work/ezhuthola/ezhuthola/##' | head -80 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
           echo "::error title=Build errors::${msg}"
+          # Failing unit tests: name and message, from the test reports.
+          fails=$(grep -ho '<testcase name="[^"]*"\|<failure message="[^"]*"' app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | grep -B1 '<failure' | head -40 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
+          if [ -n "$fails" ]; then echo "::error title=Failing tests::${fails}"; fi
       - uses: actions/upload-artifact@v4
         with:
           name: Ezhuthola-test-${{ github.ref_name }}
