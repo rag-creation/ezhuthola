@@ -128,20 +128,12 @@ object StickerArt {
     private const val TEXT_WIDTH = 470
 
     /**
-     * A cut-out made ready for a sticker: everything outside [mask] removed, trimmed to what's
-     * left, scaled to fill the sticker, with a white border and shadow. Null if nothing is left.
-     *
-     * @param work the picture being cut (any size)
-     * @param mask ALPHA_8, same size: 0 = cut away
+     * A cut-out made ready for a sticker: trimmed to what's left (the transparent parts of [cut]),
+     * scaled to fill the sticker, with a white border and shadow. Null if nothing is left.
      */
-    fun cutOut(work: Bitmap, mask: Bitmap, border: Boolean = true): Bitmap? {
-        val w = work.width
-        val h = work.height
-        val cut = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        Canvas(cut).apply {
-            drawBitmap(work, 0f, 0f, null)
-            drawBitmap(mask, 0f, 0f, Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) })
-        }
+    fun cutOut(cut: Bitmap, border: Boolean = true): Bitmap? {
+        val w = cut.width
+        val h = cut.height
         val box = StickerMath.bounds(alphaOf(cut), w, h) ?: return null
         val bw = box[2] - box[0]
         val bh = box[3] - box[1]
@@ -154,7 +146,6 @@ object StickerArt {
             RectF(left, top, left + bw * scale, top + bh * scale),
             Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
         )
-        cut.recycle()
         if (!border) return subject
 
         // White border: the shape grown by BORDER pixels.

@@ -138,105 +138,121 @@ private val CaptionColors = listOf(
     0xFFFFD23F, 0xFFFFFFFF, 0xFF111111, 0xFFFF5252, 0xFF4FC3F7, 0xFF81C784, 0xFFFF80AB, 0xFFB388FF
 ).map { it.toInt() }
 
-/** The picture being cut and what's been cut away. Plain bitmaps; Compose redraws on [version]. */
+/**
+ * The picture being cut and what's been cut away. The mask is a plain byte array
+ * (0 = cut away, 255 = kept) so every step is simple maths we control; Android only
+ * draws the finger paths. [preview] is a fresh bitmap after every change.
+ */
 private class Cutter(val work: Bitmap) {
-    val mask: Bitmap = Bitmap.createBitmap(WORK, WORK, Bitmap.Config.ALPHA_8).apply {
-        eraseColor(android.graphics.Color.BLACK) // ALPHA_8: fully kept
-        // Transparent parts of the picture (the empty bars, or a PNG that's already cut out) start removed.
-        android.graphics.Canvas(this).drawBitmap(work, 0f, 0f, dstIn())
-    }
-    private val original: Bitmap = mask.copy(Bitmap.Config.ALPHA_8, true)
-    private val history = ArrayDeque<Bitmap>()
-    private val pixels: IntArray by lazy { IntArray(WORK * WORK).also { work.getPixels(it, 0, WORK, 0, 0, WORK, WORK) } }
+    private val pixels: IntArray = IntArray(WORK * WORK).also { work.getPixels(it, 0, WORK, 0, 0, WORK, WORK) }
+    /** Transparent parts of the picture (the empty bars, or a PNG that's already cut out) can't be kept. */
+    private val photoAlpha = ByteArray(WORK * WORK) { (pixels[it] ushr 24).toByte() }
+    val mask: ByteArray = photoAlpha.copyOf()
+    private val history = ArrayDeque<ByteArray>()
 
-    /** What the screen shows: kept parts bright, removed parts faint (so you can restore them). */
-    val preview: Bitmap = Bitmap.createBitmap(WORK, WORK, Bitmap.Config.ARGB_8888)
+    var preview: Bitmap = makePreview()
+        private set
 
     val canUndo get() = history.isNotEmpty()
 
-    init { redraw() }
+    fun redraw() { preview = makePreview() }
 
-    fun redraw() {
-        val c = android.graphics.Canvas(preview)
-        c.drawColor(0, PorterDuff.Mode.CLEAR)
-        c.drawBitmap(work, 0f, 0f, Paint().apply { alpha = 60 })
-        val layer = Bitmap.createBitmap(WORK, WORK, Bitmap.Config.ARGB_8888)
-        android.graphics.Canvas(layer).apply {
-            drawBitmap(work, 0f, 0f, null)
-            drawBitmap(mask, 0f, 0f, dstIn())
+    /** Kept parts bright, removed parts faint (so you can see what Restore would bring back). */
+    private fun makePreview(): Bitmap {
+        val out = IntArray(WORK * WORK)
+        for (i in out.indices) {
+            val p = pixels[i]
+            val a = p ushr 24
+            if (a == 0) continue
+            val keep = mask[i].toInt() and 0xFF
+            val shown = (a * (60 + (195 * keep) / 255)) / 255
+            out[i] = (shown shl 24) or (p and 0xFFFFFF)
         }
-        c.drawBitmap(layer, 0f, 0f, null)
-        layer.recycle()
+        return Bitmap.createBitmap(out, WORK, WORK, Bitmap.Config.ARGB_8888)
+    }
+
+    /** The cut-out as a normal picture: the photo with everything removed made transparent. */
+    fun cutBitmap(): Bitmap {
+        val out = IntArray(WORK * WORK) { i ->
+            val p = pixels[i]
+            val a = ((p ushr 24) * (mask[i].toInt() and 0xFF)) / 255
+            (a shl 24) or (p and 0xFFFFFF)
+        }
+        return Bitmap.createBitmap(out, WORK, WORK, Bitmap.Config.ARGB_8888)
     }
 
     private fun saveUndo() {
-        history.addLast(mask.copy(Bitmap.Config.ALPHA_8, true))
-        while (history.size > MAX_UNDO) history.removeFirst().recycle()
+        history.addLast(mask.copyOf())
+        while (history.size > MAX_UNDO) history.removeFirst()
     }
 
     fun undo() {
         val last = history.removeLastOrNull() ?: return
-        copyInto(last)
-        last.recycle()
+        last.copyInto(mask)
     }
 
     fun reset() {
         saveUndo()
-        copyInto(original)
+        photoAlpha.copyInto(mask)
     }
 
-    private fun copyInto(source: Bitmap) {
-        val c = android.graphics.Canvas(mask)
-        c.drawColor(0, PorterDuff.Mode.CLEAR)
-        c.drawBitmap(source, 0f, 0f, Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC) })
+    /** Draws [draw] on a blank picture and returns its coverage, 0..255 per pixel. */
+    private fun coverage(draw: (android.graphics.Canvas) -> Unit): ByteArray {
+        val bitmap = Bitmap.createBitmap(WORK, WORK, Bitmap.Config.ARGB_8888)
+        draw(android.graphics.Canvas(bitmap))
+        val drawn = IntArray(WORK * WORK)
+        bitmap.getPixels(drawn, 0, WORK, 0, 0, WORK, WORK)
+        bitmap.recycle()
+        return ByteArray(WORK * WORK) { (drawn[it] ushr 24).toByte() }
     }
 
-    /** Keep only what's inside [path] (trace, shapes). */
-    fun keepInside(path: android.graphics.Path) {
+    /** Keep only what's inside [path] (trace, shapes). Returns how many pixels are left. */
+    fun keepInside(path: android.graphics.Path): Int {
         saveUndo()
-        val inside = Bitmap.createBitmap(WORK, WORK, Bitmap.Config.ALPHA_8)
-        android.graphics.Canvas(inside).drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.BLACK })
-        android.graphics.Canvas(mask).drawBitmap(inside, 0f, 0f, dstIn())
-        inside.recycle()
+        val inside = coverage { it.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.BLACK }) }
+        var left = 0
+        for (i in mask.indices) {
+            val v = ((mask[i].toInt() and 0xFF) * (inside[i].toInt() and 0xFF)) / 255
+            mask[i] = v.toByte()
+            if (v > 0) left++
+        }
+        return left
     }
 
     /** Eraser (keep = false) or restore brush (keep = true). */
     fun brush(path: android.graphics.Path, width: Float, keep: Boolean) {
         saveUndo()
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = width
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-            color = android.graphics.Color.BLACK
-            if (!keep) xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+        val stroke = coverage {
+            it.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = width
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+                color = android.graphics.Color.BLACK
+            })
         }
-        val c = android.graphics.Canvas(mask)
-        c.drawPath(path, paint)
-        if (keep) c.drawBitmap(work, 0f, 0f, dstIn()) // never restore the empty bars
+        for (i in mask.indices) {
+            val m = mask[i].toInt() and 0xFF
+            val s = stroke[i].toInt() and 0xFF
+            if (s == 0) continue
+            mask[i] = if (keep) min(max(m, s), photoAlpha[i].toInt() and 0xFF).toByte()
+                      else ((m * (255 - s)) / 255).toByte()
+        }
     }
 
     fun wand(x: Int, y: Int, tolerance: Int): Int {
         saveUndo()
-        val bytes = ByteArray(WORK * WORK)
-        mask.copyPixelsToBuffer(java.nio.ByteBuffer.wrap(bytes))
-        val removed = StickerMath.magicWand(pixels, bytes, WORK, WORK, x, y, tolerance)
-        mask.copyPixelsFromBuffer(java.nio.ByteBuffer.wrap(bytes))
-        return removed
+        return StickerMath.magicWand(pixels, mask, WORK, WORK, x, y, tolerance)
     }
 
     /** Shape centred on what's kept so far, as big as it. */
-    fun shape(shape: Shape) {
-        val bytes = ByteArray(WORK * WORK)
-        mask.copyPixelsToBuffer(java.nio.ByteBuffer.wrap(bytes))
-        val box = StickerMath.bounds(bytes, WORK, WORK) ?: return
+    fun shape(shape: Shape): Int {
+        val box = StickerMath.bounds(mask, WORK, WORK) ?: return 0
         val cx = (box[0] + box[2]) / 2f
         val cy = (box[1] + box[3]) / 2f
         val r = max(box[2] - box[0], box[3] - box[1]) / 2f
-        keepInside(shapePath(shape, cx, cy, r))
+        return keepInside(shapePath(shape, cx, cy, r))
     }
-
-    private fun dstIn() = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
 }
 
 private fun shapePath(shape: Shape, cx: Float, cy: Float, r: Float) = android.graphics.Path().apply {
@@ -371,7 +387,7 @@ private fun StickerMaker(onFinish: () -> Unit) {
                 CutStage(c, busy = busy, onNext = {
                     busy = true
                     scope.launch {
-                        val cut = withContext(Dispatchers.Default) { StickerArt.cutOut(c.work, c.mask) }
+                        val cut = withContext(Dispatchers.Default) { StickerArt.cutOut(c.cutBitmap()) }
                         busy = false
                         if (cut == null) {
                             Toast.makeText(context, "Nothing is left. Tap Undo or Reset.", Toast.LENGTH_SHORT).show()
@@ -467,22 +483,35 @@ private fun CutStage(c: Cutter, busy: Boolean, onNext: () -> Unit) {
     var brushDp by remember { mutableFloatStateOf(28f) }
     var tolerance by remember { mutableFloatStateOf(32f) }
     var working by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
 
-    fun change(block: () -> Unit) {
+    /** Runs a cut off the main thread, then shows the new preview and what happened. */
+    fun change(block: () -> String?) {
         working = true
         scope.launch {
-            withContext(Dispatchers.Default) { block(); c.redraw() }
+            status = withContext(Dispatchers.Default) {
+                runCatching { block().also { c.redraw() } }.getOrElse { "Something went wrong: ${it.message}" }
+            }
             working = false
             version++
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    Column(Modifier.fillMaxSize()) { // no page scrolling here: every finger on the photo is for cutting
         CutCanvas(c, version, tool, brushDp, enabled = !working && !busy) { action ->
             when (action) {
-                is CutAction.Trace -> change { c.keepInside(action.path) }
-                is CutAction.Brush -> change { c.brush(action.path, action.width, keep = tool == Tool.RESTORE) }
-                is CutAction.Tap -> if (tool == Tool.WAND) change { c.wand(action.x, action.y, tolerance.toInt()) }
+                is CutAction.Trace -> change {
+                    val left = c.keepInside(action.path)
+                    if (left == 0) "Nothing inside your line. Tap Undo." else "Kept what's inside your line"
+                }
+                is CutAction.Brush -> change {
+                    c.brush(action.path, action.width, keep = tool == Tool.RESTORE)
+                    if (tool == Tool.RESTORE) "Restored" else "Erased"
+                }
+                is CutAction.Tap -> if (tool == Tool.WAND) change {
+                    val n = c.wand(action.x, action.y, tolerance.toInt())
+                    if (n == 0) "That spot is already removed" else "Removed ${"%,d".format(n)} pixels"
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -490,12 +519,12 @@ private fun CutStage(c: Cutter, busy: Boolean, onNext: () -> Unit) {
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Tool.entries.forEach { t -> Chip(t.label, selected = t == tool) { tool = t } }
+            Tool.entries.forEach { t -> Chip(t.label, selected = t == tool) { tool = t; status = null } }
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            tool.tip + if (tool != Tool.SHAPE) " · two fingers to zoom" else "",
-            color = TextDim, fontSize = 13.sp
+            status ?: (tool.tip + if (tool != Tool.SHAPE) " · two fingers to zoom" else ""),
+            color = if (status != null) Accent else TextDim, fontSize = 13.sp
         )
         when (tool) {
             Tool.WAND -> LabeledSlider("How much", tolerance, 5f..90f) { tolerance = it }
@@ -504,14 +533,14 @@ private fun CutStage(c: Cutter, busy: Boolean, onNext: () -> Unit) {
                 Modifier.fillMaxWidth().padding(top = 8.dp).horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Shape.entries.forEach { s -> Chip(s.label, selected = false) { change { c.shape(s) } } }
+                Shape.entries.forEach { s -> Chip(s.label, selected = false) { change { c.shape(s); "${s.label} cut" } } }
             }
             Tool.TRACE -> Spacer(Modifier.height(4.dp))
         }
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Chip("Undo", selected = false, enabled = c.canUndo && !working) { change { c.undo() } }
-            Chip("Reset", selected = false, enabled = !working) { change { c.reset() } }
+            Chip("Undo", selected = false, enabled = c.canUndo && !working) { change { c.undo(); "Undone" } }
+            Chip("Reset", selected = false, enabled = !working) { change { c.reset(); "Back to the whole photo" } }
             Spacer(Modifier.weight(1f))
             Button(
                 onClick = onNext,
