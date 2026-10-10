@@ -344,8 +344,8 @@ private fun StickerMaker(onFinish: () -> Unit) {
     val picturesPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(50)) { uris ->
         if (uris.isNotEmpty()) import { StickerImport.pictures(context, uris) }
     }
-    val packPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) import { StickerImport.pack(context, uri) }
+    val packPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) import { StickerImport.files(context, uris) }
     }
 
     BackHandler(enabled = stage != Stage.PICK) {
@@ -469,8 +469,9 @@ private fun PickStage(
             enabled = !busy, onClick = onImportPictures
         )
         BigChoice(
-            "Sticker pack file",
-            "A .wastickers or .zip pack someone shared with you. Every sticker inside is added.",
+            "Sticker files",
+            "A .wastickers or .zip pack someone shared, or sticker files from the Files app " +
+                "(WhatsApp keeps received stickers in Android › media › com.whatsapp › WhatsApp › Media › WhatsApp Stickers).",
             enabled = !busy, onClick = onImportPack
         )
         Text(

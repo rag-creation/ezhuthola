@@ -300,6 +300,19 @@ object StickerImport {
         return added
     }
 
+    /** Files picked in the Files app: sticker packs (.wastickers / .zip) or single sticker pictures. */
+    fun files(context: Context, uris: List<Uri>): Int {
+        var added = 0
+        for (uri in uris.take(MAX_STICKERS)) {
+            val isZip = context.contentResolver.openInputStream(uri)?.use { input ->
+                val head = ByteArray(2)
+                input.read(head) == 2 && head[0] == 'P'.code.toByte() && head[1] == 'K'.code.toByte()
+            } ?: false
+            added += if (isZip) pack(context, uri) else pictures(context, listOf(uri))
+        }
+        return added
+    }
+
     /** A sticker pack: a .wastickers or .zip file full of .webp / .png stickers. */
     fun pack(context: Context, uri: Uri): Int {
         val store = StickerStore(context)
