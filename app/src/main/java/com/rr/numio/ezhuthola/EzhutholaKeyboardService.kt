@@ -123,6 +123,16 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var history = ClipboardHistory()
     /** The last clipboard text we looked at, so a clip you deleted isn't added again. */
     private var lastClipText: String? = null
+
+    /** Copied a moment ago: shown as a chip in the strip until pasted or [JUST_COPIED_MS] pass. */
+    private var justCopied by mutableStateOf<String?>(null)
+    private val hideJustCopied = Runnable { justCopied = null }
+
+    private fun showJustCopied(text: String) {
+        justCopied = text
+        mainHandler.removeCallbacks(hideJustCopied)
+        mainHandler.postDelayed(hideJustCopied, JUST_COPIED_MS)
+    }
     private var clipboardOn by mutableStateOf(true)
     private var clips by mutableStateOf<List<Clip>>(emptyList())
 
@@ -252,7 +262,12 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     onOpenStickers = ::openStickers,
                     onSendSticker = ::sendSticker,
                     onMakeSticker = ::openStickerMaker,
-                    onDeleteSticker = { stickerStore.delete(it); stickers = stickerStore.list() }
+                    onDeleteSticker = { stickerStore.delete(it); stickers = stickerStore.list() },
+                    justCopied = justCopied,
+                    onPasteJustCopied = {
+                        justCopied?.let(::pasteClip)
+                        justCopied = null
+                    }
                 )
             }
         }
@@ -659,6 +674,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private fun onCopied() {
         val text = readClipboard() ?: return
         lastClipText = text
+        showJustCopied(text)
         history.add(text, now())
         clips = history.all(now())
         saveClips()
@@ -673,6 +689,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         val text = readClipboard() ?: return
         if (text == lastClipText) return // already have it, or it was deleted on purpose
         lastClipText = text
+        // Only a fresh copy gets the chip, not something copied hours ago before a restart.
+        val copiedAt = try { clipboard.primaryClipDescription?.timestamp ?: 0L } catch (e: Exception) { 0L }
+        if (System.currentTimeMillis() - copiedAt < JUST_COPIED_MS) showJustCopied(text)
         // Already in the list (saved before Android closed the keyboard)? Leave it where it is.
         if (history.all(now()).any { it.text == text }) return
         history.add(text, now())
@@ -872,5 +891,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         const val ML_USER_FILE = "user_words_ml.tsv"
         const val CLIPS_FILE = "pinned_clips.txt"
         const val RECENT_CLIPS_FILE = "recent_clips.txt"
+        /** How long the "just copied" chip stays in the strip. */
+        const val JUST_COPIED_MS = 120_000L
     }
 }

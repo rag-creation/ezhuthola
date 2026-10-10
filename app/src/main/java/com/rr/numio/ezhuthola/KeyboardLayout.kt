@@ -155,7 +155,9 @@ fun KeyboardLayout(
     onOpenStickers: () -> Unit = {},
     onSendSticker: (File) -> Unit = {},
     onMakeSticker: () -> Unit = {},
-    onDeleteSticker: (File) -> Unit = {}
+    onDeleteSticker: (File) -> Unit = {},
+    justCopied: String? = null,        // copied a moment ago: shown as a chip, one tap pastes
+    onPasteJustCopied: () -> Unit = {}
 ) {
     CompositionLocalProvider(LocalKeyboardTheme provides theme, LocalKeyFeedback provides feedback) {
         Box(Modifier.fillMaxWidth()) {
@@ -181,7 +183,9 @@ fun KeyboardLayout(
                 onOpenStickers = onOpenStickers,
                 onSendSticker = onSendSticker,
                 onMakeSticker = onMakeSticker,
-                onDeleteSticker = onDeleteSticker
+                onDeleteSticker = onDeleteSticker,
+                justCopied = justCopied,
+                onPasteJustCopied = onPasteJustCopied
             )
         }
     }
@@ -214,7 +218,9 @@ private fun KeyboardContent(
     onOpenStickers: () -> Unit = {},
     onSendSticker: (File) -> Unit = {},
     onMakeSticker: () -> Unit = {},
-    onDeleteSticker: (File) -> Unit = {}
+    onDeleteSticker: (File) -> Unit = {},
+    justCopied: String? = null,        // copied a moment ago: shown as a chip, one tap pastes
+    onPasteJustCopied: () -> Unit = {}
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -288,7 +294,9 @@ private fun KeyboardContent(
                 onOpenSettings = onOpenSettings,
                 onOpenClipboard = { onOpenClipboard(); clipboardOpen = true },
                 onOpenStickers = { onOpenStickers(); stickersOpen = true },
-                onOpenEmoji = { emojiOpen = true }
+                onOpenEmoji = { emojiOpen = true },
+                justCopied = if (clipboardOn) justCopied else null,
+                onPasteJustCopied = onPasteJustCopied
             )
         } else {
             SuggestionStrip(suggestions, onPick)
@@ -360,8 +368,8 @@ private fun KeyboardContent(
                 label = ",",
                 modifier = Modifier.weight(1f),
                 color = SpecialKeyColor,
-                hintIcon = { SmileHint(HintText) },
-                onLongPress = { emojiOpen = true }   // hold comma → emoji panel
+                hint = "@",
+                onLongPress = { onText("@") }        // hold comma → @ (emoji has its own strip button)
             ) { onText(",") }
 
             // The Ezhuthola key: switches Malayalam <-> English.
@@ -989,6 +997,8 @@ private fun IdleStrip(
     onOpenClipboard: () -> Unit,
     onOpenStickers: () -> Unit,
     onOpenEmoji: () -> Unit,
+    justCopied: String? = null,
+    onPasteJustCopied: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -999,9 +1009,42 @@ private fun IdleStrip(
     ) {
         StripButton(onOpenSettings) { SettingsIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenEmoji) { SmileIcon(HintText, Modifier.size(24.dp), accent = Accent) }
-        Spacer(Modifier.weight(1f))
+        Box(Modifier.weight(1f).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
+            if (justCopied != null) JustCopiedChip(justCopied, onPasteJustCopied)
+        }
         StripButton(onOpenStickers) { StickerIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenClipboard) { ClipboardIcon(HintText, Modifier.size(24.dp)) }
+    }
+}
+
+/** What you just copied, as a chip in the strip: tap to paste it. Like Gboard and FUTO. */
+@Composable
+private fun JustCopiedChip(text: String, onPaste: () -> Unit) {
+    val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
+    Row(
+        modifier = Modifier
+            .widthIn(max = 220.dp)
+            .height(38.dp)
+            .clip(RoundedCornerShape(19.dp))
+            .background(CardColor)
+            .border(1.dp, Accent.copy(alpha = 0.6f), RoundedCornerShape(19.dp))
+            .clickable {
+                view.keyTap(feedback)
+                onPaste()
+            }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ClipboardIcon(HintText, Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = text.replace('\n', ' '),
+            color = KeyText,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
