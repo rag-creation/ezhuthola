@@ -23,7 +23,14 @@ import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
 import com.rr.numio.ezhuthola.engine.StickerMath
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.graphics.Matrix
+import android.media.ExifInterface
+import android.net.Uri
 import java.io.File
+import java.util.zip.ZipInputStream
+import kotlin.math.max
 
 /**
  * Stickers live in the app's private storage (the "stickers" folder, as .webp files),
@@ -53,7 +60,7 @@ class StickerStore(private val context: Context) {
 
     /** Saves a finished sticker and returns its file. */
     fun add(bitmap: Bitmap): File {
-        val file = File(dir, "my_${System.currentTimeMillis()}.webp")
+        val file = File(dir, "my_${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().take(8)}.webp")
         writeWebp(bitmap, file)
         return file
     }
@@ -270,4 +277,108 @@ object StickerSender {
             else -> StickerResult.IMAGE
         }
     }
+}
+
+/**
+ * "Add your own": stickers people already have (pictures, or a WhatsApp-style .wastickers / .zip
+ * pack someone shared). They're added as they are, fitted to 512×512 with transparency kept.
+ * The files come in through Android's picker, so Ezhuthola still needs no permissions.
+ */
+object StickerImport {
+    private const val MAX_STICKERS = 120
+    private const val MAX_ENTRY_BYTES = 5_000_000
+
+    /** Pictures picked from the gallery or files. Returns how many were added. */
+    fun pictures(context: Context, uris: List<Uri>): Int {
+        val store = StickerStore(context)
+        var added = 0
+        for (uri in uris.take(MAX_STICKERS)) {
+            val picture = decode(context, uri, maxSide = 1024) ?: continue
+            store.add(fitted(picture))
+            added++
+        }
+        return added
+    }
+
+    /** A sticker pack: a .wastickers or .zip file full of .webp / .png stickers. */
+    fun pack(context: Context, uri: Uri): Int {
+        val store = StickerStore(context)
+        var added = 0
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            ZipInputStream(input.buffered()).use { zip ->
+                while (added < MAX_STICKERS) {
+                    val entry = zip.nextEntry ?: break
+                    val name = entry.name.lowercase()
+                    val isPicture = name.endsWith(".webp") || name.endsWith(".png") ||
+                        name.endsWith(".jpg") || name.endsWith(".jpeg")
+                    if (entry.isDirectory || !isPicture || name.substringAfterLast('/').startsWith("tray")) continue
+                    val bytes = readLimited(zip) ?: continue
+                    val picture = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
+                    if (max(picture.width, picture.height) < 128) continue // pack icons, not stickers
+                    store.add(fitted(picture))
+                    added++
+                }
+            }
+        }
+        return added
+    }
+
+    /** Reads one zip entry, refusing anything unreasonably big. */
+    private fun readLimited(zip: ZipInputStream): ByteArray? {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(16 * 1024)
+        while (true) {
+            val n = zip.read(buffer)
+            if (n < 0) break
+            out.write(buffer, 0, n)
+            if (out.size() > MAX_ENTRY_BYTES) return null
+        }
+        return out.toByteArray()
+    }
+
+    /** Fits a picture inside the 512 sticker square, centred, keeping its see-through parts. */
+    fun fitted(picture: Bitmap): Bitmap {
+        val size = StickerArt.SIZE
+        val scale = size.toFloat() / max(picture.width, picture.height)
+        val w = picture.width * scale
+        val h = picture.height * scale
+        val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        Canvas(out).drawBitmap(
+            picture, null, RectF((size - w) / 2, (size - h) / 2, (size + w) / 2, (size + h) / 2),
+            Paint(Paint.FILTER_BITMAP_FLAG)
+        )
+        return out
+    }
+
+    /** Opens a picture the right way up, no bigger than [maxSide]. Animated stickers give their first frame. */
+    fun decode(context: Context, uri: Uri, maxSide: Int): Bitmap? = runCatching {
+    return@runCatching if (Build.VERSION.SDK_INT >= 28) {
+        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            val big = max(info.size.width, info.size.height)
+            if (big > maxSide) {
+                val s = maxSide.toFloat() / big
+                decoder.setTargetSize((info.size.width * s).toInt(), (info.size.height * s).toInt())
+            }
+        }
+    } else {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (max(bounds.outWidth, bounds.outHeight) / sample > maxSide) sample *= 2
+        val raw = context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+        } ?: return@runCatching null
+        val degrees = context.contentResolver.openInputStream(uri)?.use {
+            when (ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+        } ?: 0f
+        if (degrees == 0f) raw
+        else Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, Matrix().apply { postRotate(degrees) }, true)
+    }
+    }.getOrNull()
 }

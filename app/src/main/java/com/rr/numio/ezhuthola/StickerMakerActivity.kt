@@ -279,35 +279,8 @@ private fun shapePath(shape: Shape, cx: Float, cy: Float, r: Float) = android.gr
 }
 
 /** The chosen photo, upright, fitted inside a 1024 square (transparent around it). */
-private fun loadPhoto(context: Context, uri: Uri): Bitmap? = runCatching {
-    val photo: Bitmap = if (Build.VERSION.SDK_INT >= 28) {
-        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
-            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            val big = max(info.size.width, info.size.height)
-            if (big > 2048) {
-                val s = 2048f / big
-                decoder.setTargetSize((info.size.width * s).toInt(), (info.size.height * s).toInt())
-            }
-        }
-    } else {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        var sample = 1
-        while (max(bounds.outWidth, bounds.outHeight) / sample > 2048) sample *= 2
-        val raw = context.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-        } ?: return null
-        val degrees = context.contentResolver.openInputStream(uri)?.use {
-            when (ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-                else -> 0f
-            }
-        } ?: 0f
-        if (degrees == 0f) raw
-        else Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, Matrix().apply { postRotate(degrees) }, true)
-    }
+private fun loadPhoto(context: Context, uri: Uri): Bitmap? {
+    val photo = StickerImport.decode(context, uri, maxSide = 2048) ?: return null
     val work = Bitmap.createBitmap(WORK, WORK, Bitmap.Config.ARGB_8888)
     val scale = WORK.toFloat() / max(photo.width, photo.height)
     val w = photo.width * scale
@@ -316,8 +289,8 @@ private fun loadPhoto(context: Context, uri: Uri): Bitmap? = runCatching {
         photo, null, RectF((WORK - w) / 2, (WORK - h) / 2, (WORK + w) / 2, (WORK + h) / 2),
         Paint(Paint.FILTER_BITMAP_FLAG)
     )
-    work
-}.getOrNull()
+    return work
+}
 
 // ---- Screen ---------------------------------------------------------------------
 
@@ -353,6 +326,28 @@ private fun StickerMaker(onFinish: () -> Unit) {
         }
     }
 
+    /** Runs an import off the main thread, then says how many were added. */
+    fun import(block: () -> Int) {
+        busy = true
+        scope.launch {
+            val added = withContext(Dispatchers.Default) { runCatching(block).getOrDefault(0) }
+            busy = false
+            val message = when (added) {
+                0 -> "No stickers found in that file"
+                1 -> "Added 1 sticker. It's in Ezhuthola's sticker tab."
+                else -> "Added $added stickers. They're in Ezhuthola's sticker tab."
+            }
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            if (added > 0) onFinish()
+        }
+    }
+    val picturesPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(50)) { uris ->
+        if (uris.isNotEmpty()) import { StickerImport.pictures(context, uris) }
+    }
+    val packPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) import { StickerImport.pack(context, uri) }
+    }
+
     BackHandler(enabled = stage != Stage.PICK) {
         stage = if (stage == Stage.CAPTION && cutter != null) Stage.CUT else Stage.PICK
     }
@@ -383,6 +378,10 @@ private fun StickerMaker(onFinish: () -> Unit) {
             Stage.PICK -> PickStage(
                 busy = busy,
                 onPhoto = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                onImportPictures = {
+                    picturesPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
+                onImportPack = { packPicker.launch(arrayOf("application/zip", "application/octet-stream", "application/x-zip-compressed", "*/*")) },
                 onTextOnly = {
                     cutter = null
                     cutPicture = null
@@ -447,21 +446,41 @@ private fun TopBar(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun PickStage(busy: Boolean, onPhoto: () -> Unit, onTextOnly: () -> Unit) {
+private fun PickStage(
+    busy: Boolean,
+    onPhoto: () -> Unit,
+    onImportPictures: () -> Unit,
+    onImportPack: () -> Unit,
+    onTextOnly: () -> Unit
+) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         BigChoice("From a photo", "Cut out a face, a pet, anything. Then add Malayalam text.", enabled = !busy, onClick = onPhoto)
         BigChoice("Text only", "Big Malayalam words with a white outline, like പൊളി.", enabled = !busy, onClick = onTextOnly)
-        if (busy) Text("Opening photo…", color = Accent, fontSize = 14.sp)
+        if (busy) Text("Working…", color = Accent, fontSize = 14.sp)
+
+        Spacer(Modifier.height(4.dp))
+        Text("ADD YOUR OWN", color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp)
+        BigChoice(
+            "Pictures",
+            "Stickers or images you already have (PNG, WebP, JPG). Pick several at once; they're added as they are.",
+            enabled = !busy, onClick = onImportPictures
+        )
+        BigChoice(
+            "Sticker pack file",
+            "A .wastickers or .zip pack someone shared with you. Every sticker inside is added.",
+            enabled = !busy, onClick = onImportPack
+        )
         Text(
             "Tip: if your phone's Gallery can cut a person out of a photo (Samsung, Pixel, Xiaomi and others can), " +
                 "save that cut-out and pick it here. Ezhuthola keeps the cut and adds the white border.",
             color = TextDim, fontSize = 13.sp, lineHeight = 18.sp
         )
         Text(
-            "Your photos never leave your phone. Ezhuthola has no internet permission.",
+            "Your photos and stickers never leave your phone. Ezhuthola has no internet permission. " +
+                "Moving stickers are added as a still picture (their first frame).",
             color = TextDim, fontSize = 13.sp, lineHeight = 18.sp
         )
     }
