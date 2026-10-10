@@ -76,4 +76,20 @@ class StickerMathTest {
         assertEquals(20f, left, 0.001f)
         assertEquals((512 - 100 * scale) / 2, top, 0.001f)
     }
+
+    @Test fun holesInsideAreFilledButOutsideStaysClear() {
+        // 7×7: a ring (kept) with a see-through hole in the middle, clear around the outside.
+        val ring = ByteArray(49) { i ->
+            val x = i % 7
+            val y = i / 7
+            val onRing = (x in 1..5 && y in 1..5) && !(x in 2..4 && y in 2..4)
+            if (onRing) -1 else 0
+        }
+        val filled = StickerMath.fillHoles(ring, 7, 7)
+        fun a(x: Int, y: Int) = filled[y * 7 + x].toInt() and 0xFF
+        assertEquals(255, a(3, 3))  // hole: filled
+        assertEquals(255, a(1, 1))  // ring: kept
+        assertEquals(0, a(0, 0))    // outside: still clear
+        assertEquals(0, a(6, 3))
+    }
 }

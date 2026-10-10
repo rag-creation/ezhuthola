@@ -123,21 +123,21 @@ object StickerFonts {
 /** Draws stickers: cut-out photo with a white border and soft shadow, plus an outlined caption. */
 object StickerArt {
     const val SIZE = 512
-    private const val BORDER = 14f      // white outline around a cut-out photo
-    private const val MARGIN = 30       // room for the border and its shadow
+    const val BORDER_THIN = 8f          // white outline around a cut-out photo
+    const val BORDER_THICK = 15f
     private const val TEXT_WIDTH = 470
 
     /**
      * A cut-out made ready for a sticker: trimmed to what's left (the transparent parts of [cut]),
-     * scaled to fill the sticker, with a white border and shadow. Null if nothing is left.
+     * scaled to fill the sticker, with a white border (0 = none) and shadow. Null if nothing is left.
      */
-    fun cutOut(cut: Bitmap, border: Boolean = true): Bitmap? {
+    fun cutOut(cut: Bitmap, border: Float = BORDER_THIN): Bitmap? {
         val w = cut.width
         val h = cut.height
         val box = StickerMath.bounds(alphaOf(cut), w, h) ?: return null
         val bw = box[2] - box[0]
         val bh = box[3] - box[1]
-        val (left, top, scale) = StickerMath.fit(bw, bh, SIZE, if (border) MARGIN else 8).toList()
+        val (left, top, scale) = StickerMath.fit(bw, bh, SIZE, if (border > 0f) border.toInt() + 16 else 8).toList()
 
         val subject = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888)
         Canvas(subject).drawBitmap(
@@ -146,10 +146,17 @@ object StickerArt {
             RectF(left, top, left + bw * scale, top + bh * scale),
             Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
         )
-        if (!border) return subject
+        if (border <= 0f) return subject
 
-        // White border: the shape grown by BORDER pixels.
-        val ring = StickerMath.outline(alphaOf(subject), SIZE, SIZE, BORDER)
+        // White border around the outside edge only (holes inside are filled first),
+        // so letters and rings don't each get their own border.
+        val alpha = alphaOf(subject)
+        val outer = StickerMath.fillHoles(alpha, SIZE, SIZE)
+        val ring = StickerMath.outline(outer, SIZE, SIZE, border)
+        // Holes stay see-through: no white fill inside a ring or between letters.
+        for (i in ring.indices) {
+            if (outer[i].toInt() == -1 && (alpha[i].toInt() and 0xFF) <= 16) ring[i] = alpha[i]
+        }
         val ringBitmap = Bitmap.createBitmap(
             IntArray(SIZE * SIZE) { ((ring[it].toInt() and 0xFF) shl 24) or 0xFFFFFF },
             SIZE, SIZE, Bitmap.Config.ARGB_8888

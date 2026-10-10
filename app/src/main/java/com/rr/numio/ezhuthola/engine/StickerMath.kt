@@ -148,6 +148,35 @@ object StickerMath {
     }
 
     /**
+     * The outside shape only: see-through holes *inside* the cut-out (between letters, inside a
+     * ring) are filled in, so the white border follows the outer edge instead of every letter.
+     */
+    fun fillHoles(alpha: ByteArray, width: Int, height: Int, threshold: Int = 16): ByteArray {
+        val outside = BooleanArray(width * height)
+        val queue = IntArray(width * height)
+        var tail = 0
+        fun seed(i: Int) {
+            if (!outside[i] && (alpha[i].toInt() and 0xFF) <= threshold) {
+                outside[i] = true
+                queue[tail++] = i
+            }
+        }
+        for (x in 0 until width) { seed(x); seed((height - 1) * width + x) }
+        for (y in 0 until height) { seed(y * width); seed(y * width + width - 1) }
+        var head = 0
+        while (head < tail) {
+            val i = queue[head++]
+            val x = i % width
+            val y = i / width
+            if (x > 0) seed(i - 1)
+            if (x < width - 1) seed(i + 1)
+            if (y > 0) seed(i - width)
+            if (y < height - 1) seed(i + width)
+        }
+        return ByteArray(width * height) { if (outside[it]) alpha[it] else -1 }
+    }
+
+    /**
      * Where a cut-out of size [w]×[h] goes in a square sticker of side [size], leaving
      * [margin] on every side for the outline: [left, top, scale].
      */

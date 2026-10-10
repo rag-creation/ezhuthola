@@ -327,7 +327,14 @@ private fun StickerMaker(onFinish: () -> Unit) {
     val scope = rememberCoroutineScope()
     var stage by remember { mutableStateOf(Stage.PICK) }
     var cutter by remember { mutableStateOf<Cutter?>(null) }
-    var subject by remember { mutableStateOf<Bitmap?>(null) }
+    var cutPicture by remember { mutableStateOf<Bitmap?>(null) }   // the photo with the cut applied
+    var border by remember { mutableFloatStateOf(StickerArt.BORDER_THIN) }
+    var subject by remember { mutableStateOf<Bitmap?>(null) }      // trimmed, scaled, with border
+    // Re-make the bordered cut-out when the border changes.
+    androidx.compose.runtime.LaunchedEffect(cutPicture, border) {
+        val picture = cutPicture
+        subject = if (picture == null) null else withContext(Dispatchers.Default) { StickerArt.cutOut(picture, border) }
+    }
     var caption by remember { mutableStateOf(Caption("", size = 110f, y = 0.84f)) }
     var busy by remember { mutableStateOf(false) }
 
@@ -378,7 +385,7 @@ private fun StickerMaker(onFinish: () -> Unit) {
                 onPhoto = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 onTextOnly = {
                     cutter = null
-                    subject = null
+                    cutPicture = null
                     caption = Caption("", size = 150f, y = 0.5f)
                     stage = Stage.CAPTION
                 }
@@ -387,12 +394,14 @@ private fun StickerMaker(onFinish: () -> Unit) {
                 CutStage(c, busy = busy, onNext = {
                     busy = true
                     scope.launch {
-                        val cut = withContext(Dispatchers.Default) { StickerArt.cutOut(c.cutBitmap()) }
+                        val picture = withContext(Dispatchers.Default) {
+                            c.cutBitmap().takeIf { StickerArt.cutOut(it, 0f) != null }
+                        }
                         busy = false
-                        if (cut == null) {
+                        if (picture == null) {
                             Toast.makeText(context, "Nothing is left. Tap Undo or Reset.", Toast.LENGTH_SHORT).show()
                         } else {
-                            subject = cut
+                            cutPicture = picture
                             stage = Stage.CAPTION
                         }
                     }
@@ -400,6 +409,8 @@ private fun StickerMaker(onFinish: () -> Unit) {
             }
             Stage.CAPTION -> CaptionStage(
                 subject = subject,
+                border = if (cutPicture != null) border else null,
+                onBorder = { border = it },
                 caption = caption,
                 onCaption = { caption = it },
                 onSave = { art ->
@@ -711,6 +722,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawChecker(area: S
 @Composable
 private fun CaptionStage(
     subject: Bitmap?,
+    border: Float?,              // null: text-only sticker, no border choice
+    onBorder: (Float) -> Unit,
     caption: Caption,
     onCaption: (Caption) -> Unit,
     onSave: (Bitmap) -> Unit
@@ -794,6 +807,18 @@ private fun CaptionStage(
             }
         }
         LabeledSlider("Text size", caption.size, 50f..220f) { onCaption(caption.copy(size = it)) }
+        if (border != null) {
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Border", color = TextDim, fontSize = 13.sp, modifier = Modifier.width(76.dp))
+                listOf("None" to 0f, "Thin" to StickerArt.BORDER_THIN, "Thick" to StickerArt.BORDER_THICK).forEach { (label, size) ->
+                    Chip(label, selected = border == size) { onBorder(size) }
+                }
+            }
+        }
         Text("Drag the text on the sticker to move it.", color = TextDim, fontSize = 13.sp)
         Spacer(Modifier.height(12.dp))
         val empty = subject == null && caption.text.isBlank()
