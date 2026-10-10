@@ -107,4 +107,25 @@ class MalayalamSuggesterTest {
         assertEquals("സ്റ്റേഷൻ", en("station"))
         assertEquals("റെയിൽവേ", en("railway"))
     }
+
+    @Test fun secondTestParagraph() {
+        assertEquals("ഭയങ്കര", en("bhayangara"))
+        assertEquals("ഇഷ്ടമായി", en("ishttamaayi"))
+        assertEquals("ഇഷ്ടമായി", en("ishtamaayi"))
+        assertEquals("അച്ഛന്", en("achanu"))
+        assertEquals("മറ്റന്നാൾ", en("mattennal"))
+        assertEquals("മറ്റന്നാൾ", en("mattannal"))
+        for (t in listOf("njayarazhcha", "njayaraycha", "njaayaraazhcha")) assertEquals("ഞായറാഴ്ച", en(t), t)
+        for (t in listOf("thinkalazhcha", "thingalazcha", "thinkalaazhcha")) assertEquals("തിങ്കളാഴ്ച", en(t), t)
+        for (t in listOf("chovvazcha", "chovvazhchcha", "chovvaazhcha")) assertEquals("ചൊവ്വാഴ്ച", en(t), t)
+        for (t in listOf("budhanaazhacha", "budhanazhcha", "budanazcha")) assertEquals("ബുധനാഴ്ച", en(t), t)
+        for (t in listOf("vyazhazhcha", "vyaazhaazhcha")) assertEquals("വ്യാഴാഴ്ച", en(t), t)
+        for (t in listOf("velliyazhcha", "velliazhcha", "velliyaazhcha")) assertEquals("വെള്ളിയാഴ്ച", en(t), t)
+        for (t in listOf("sheniyazhcha", "shaniyazhcha", "saniyazhcha", "shaniyaycha")) assertEquals("ശനിയാഴ്ച", en(t), t)
+        // Nothing nearby broke
+        assertEquals("കുട്ടി", en("kutti"))
+        assertEquals("അങ്ങനെ", en("angane"))
+        assertEquals("അവന്", en("avanu"))
+        assertEquals("അവൻ", en("avan"))
+    }
 }
