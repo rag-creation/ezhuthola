@@ -26,8 +26,8 @@ class StickerStore(private val context: Context) {
 
     /** Newest first. */
     fun list(): List<File> =
-        dir.listFiles { f -> f.isFile && f.name.endsWith(".webp") }
-            .orEmpty()
+        dir.listFiles().orEmpty()
+            .filter { it.isFile && it.name.endsWith(".webp") }
             .sortedByDescending { it.lastModified() }
 
     /** First time only: a few Ezhuthola text stickers, so the tab isn't empty. */
