@@ -7,9 +7,10 @@ data class Clip(val text: String, val time: Long, val pinned: Boolean = false)
  * Recently copied text, for the clipboard panel.
  *
  * - Newest first; pinned clips stay at the top and never expire.
- * - Unpinned clips disappear after an hour, and only the last [MAX_RECENT] are kept.
+ * - Only the last [MAX_RECENT] unpinned clips are kept: copying a new one drops the oldest.
+ *   No timer, so something copied this morning is still there tonight.
  * - Pinned clips are saved with [toText], recent ones with [recentToText] (kept in the app's
- *   private storage so they survive Android closing the keyboard; still gone after an hour).
+ *   private storage so they survive Android closing the keyboard).
  */
 class ClipboardHistory(clips: List<Clip> = emptyList()) {
 
@@ -82,14 +83,12 @@ class ClipboardHistory(clips: List<Clip> = emptyList()) {
     }
 
     private fun prune(now: Long) {
-        list.removeAll { !it.pinned && now - it.time > EXPIRE_MS }
         var recent = 0
         list.removeAll { !it.pinned && ++recent > MAX_RECENT }
     }
 
     companion object {
         const val JUST_COPIED_MS = 60_000L          // chip in the strip: 1 minute
-        private const val EXPIRE_MS = 60 * 60_000L  // unpinned clips: 1 hour
         private const val MAX_RECENT = 20
         private const val MAX_LENGTH = 5_000
 

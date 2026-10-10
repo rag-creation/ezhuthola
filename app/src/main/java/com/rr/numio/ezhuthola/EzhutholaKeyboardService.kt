@@ -702,7 +702,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     /**
      * Pinned clips, and recent ones, are written to the app's private storage. Recent clips are
      * saved too because Android (Samsung especially) closes keyboards in the background, which
-     * used to wipe the list. They still expire after an hour, like before.
+     * used to wipe the list. Only the last 20 are kept; there is no timer.
      */
     private fun saveClips() {
         val pinnedText = if (history.dirty) history.toText() else null

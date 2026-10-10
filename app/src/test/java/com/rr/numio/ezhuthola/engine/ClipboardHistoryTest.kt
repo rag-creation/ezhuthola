@@ -16,12 +16,17 @@ class ClipboardHistoryTest {
         assertEquals(listOf("one", "two"), h.all(3).map { it.text })
     }
 
-    @Test fun unpinnedClipsExpireAfterAnHour() {
+    @Test fun clipsDontExpireButOnlyTheLast20AreKept() {
         val h = ClipboardHistory()
-        h.add("old", 0)
-        h.togglePin("old")
-        h.add("gone", 0)
-        assertEquals(listOf("old"), h.all(hour + 1).map { it.text })
+        h.add("pinned", 0); h.togglePin("pinned")
+        h.add("this morning", 0)
+        assertEquals(listOf("pinned", "this morning"), h.all(12 * hour).map { it.text })  // no timer
+        for (i in 1..20) h.add("copy $i", i.toLong())
+        val recent = h.all(21).filter { !it.pinned }.map { it.text }
+        assertEquals(20, recent.size)
+        assertEquals("copy 20", recent.first())       // newest first
+        assertTrue("this morning" !in recent)          // the oldest made room
+        assertTrue(h.all(21).first().pinned)           // pinned stays
     }
 
     @Test fun clearAllKeepsPinned() {

@@ -1036,7 +1036,7 @@ private fun SettingsIcon(color: Color, modifier: Modifier) {
 /**
  * Clipboard panel: opens in place of the keys, like the emoji panel.
  * Tap a clip to paste it. Hold a clip to pin or delete it. Pinned clips stay until removed;
- * the rest disappear after an hour. Passwords and OTPs are never saved.
+ * only the last 20 others are kept (a new copy drops the oldest). Passwords and OTPs are never saved.
  */
 @Composable
 private fun ClipboardPanel(
