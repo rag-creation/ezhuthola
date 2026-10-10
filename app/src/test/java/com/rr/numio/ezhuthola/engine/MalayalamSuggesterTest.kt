@@ -49,9 +49,13 @@ class MalayalamSuggesterTest {
 
     // ---- English words typed in Malayalam mode ------------------------------------
 
+    // Like the keyboard: the main list plus Ezhuthola's own extra words (മന്തി, കേരളം…).
     private val withEnglish = MalayalamSuggester(
         MalayalamEngine(MalayalamRules.fromJson(javaClass.getResource("/ezhuthola_rules.json")!!.readText())),
-        WordFrequencies.fromTsv(javaClass.getResource("/ml_words.tsv")!!.readText().lineSequence()),
+        WordFrequencies.fromTsv(
+            javaClass.getResource("/ml_words.tsv")!!.readText().lineSequence() +
+                javaClass.getResource("/ml_extra_words.tsv")!!.readText().lineSequence()
+        ),
         english = EnglishInMalayalam.fromTsv(javaClass.getResource("/en_ml_words.tsv")!!.readText().lineSequence())
     )
 

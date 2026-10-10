@@ -75,7 +75,9 @@ class MalayalamSuggester(
 
     /** Base word + ending, for forms the word list doesn't have ("keralathil" → കേരളത്തിൽ). */
     private val splitter = SuffixSplitter(realWords = { manglish ->
-        pool(manglish).map { it to frequencies.of(it) }.filter { it.second > 0 }.sortedByDescending { it.second }
+        // The base may be an English word: cinema + kk → സിനിമ + യ്ക്ക്, phone + inte → ഫോൺ + ിന്റെ.
+        val bases = pool(manglish).also { set -> english?.of(manglish)?.let { set += it.malayalam } }
+        bases.map { it to frequencies.of(it) }.filter { it.second > 0 }.sortedByDescending { it.second }
     })
 
     fun suggest(typed: String): Suggestions = suggest(typed, withEnglish = true)
