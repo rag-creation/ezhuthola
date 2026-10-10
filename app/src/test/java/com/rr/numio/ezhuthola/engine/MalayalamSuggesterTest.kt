@@ -123,7 +123,7 @@ class MalayalamSuggesterTest {
         for (t in listOf("velliyazhcha", "velliazhcha", "velliyaazhcha")) assertEquals("വെള്ളിയാഴ്ച", en(t), t)
         for (t in listOf("sheniyazhcha", "shaniyazhcha", "saniyazhcha", "shaniyaycha")) assertEquals("ശനിയാഴ്ച", en(t), t)
         // Nothing nearby broke
-        assertEquals("കുട്ടി", en("kutti"))
+        assertEquals("കുട്ടി", en("kutti"), "kutti: " + withEnglish.suggest("kutti").words)
         assertEquals("അങ്ങനെ", en("angane"))
         assertEquals("അവന്", en("avanu"))
         assertEquals("അവൻ", en("avan"))

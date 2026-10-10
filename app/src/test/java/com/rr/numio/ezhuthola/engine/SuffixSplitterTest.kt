@@ -56,8 +56,8 @@ class SuffixSplitterTest {
 
     @Test fun englishWordsDontTurnIntoUnrelatedWords() {
         // "but" once matched ബൂത്ത് (booth) through the ത്ത rule
-        assertEquals(false, suggester.suggest("but").words.contains("ബൂത്ത്"))
-        assertEquals(false, suggester.suggest("that").words.contains("ത്തത്"))
+        assertEquals(false, suggester.suggest("but").words.contains("ബൂത്ത്"), "but: " + suggester.suggest("but").words)
+        assertEquals(false, suggester.suggest("that").words.contains("ത്തത്"), "that: " + suggester.suggest("that").words)
     }
 
     @Test fun manglishChIsUsuallyDouble() {
