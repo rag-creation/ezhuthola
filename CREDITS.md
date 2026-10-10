@@ -112,6 +112,18 @@ authorization of the copyright holder.
 SPDX-License-Identifier: Unicode-3.0
 ```
 
+## English words in Malayalam script
+
+In Malayalam mode, English words are written the way Malayalis write them (four → ഫോർ,
+media → മീഡിയ). `en_ml_words.tsv` is built by [tools/make_en_malayalam.py](tools/make_en_malayalam.py) from:
+
+- **The CMU Pronouncing Dictionary** (Carnegie Mellon University), for how English words sound:
+  https://github.com/cmusphinx/cmudict, BSD 2-clause licence, full text in [licenses/CMUdict-BSD.txt](licenses/CMUdict-BSD.txt).
+- **FrequencyWords** (above), for which English words are common.
+- Ezhuthola's own sound-to-Malayalam rules and hand-written spellings ([tools/en_ml_overrides.tsv](tools/en_ml_overrides.tsv)), GPL-3.0.
+
+To rebuild: `python3 tools/make_en_malayalam.py path/to/cmudict.dict`
+
 ## Libraries
 
 **AndroidX** (Jetpack Compose, Material 3, Core, Lifecycle, Activity, Emoji2 Emoji Picker)

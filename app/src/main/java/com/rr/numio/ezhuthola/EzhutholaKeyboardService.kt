@@ -36,6 +36,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.rr.numio.ezhuthola.engine.Clip
 import com.rr.numio.ezhuthola.engine.ClipboardHistory
 import com.rr.numio.ezhuthola.engine.EmojiSearch
+import com.rr.numio.ezhuthola.engine.EnglishInMalayalam
 import com.rr.numio.ezhuthola.engine.EnglishSuggester
 import com.rr.numio.ezhuthola.engine.MalayalamEngine
 import com.rr.numio.ezhuthola.engine.MalayalamRules
@@ -183,7 +184,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             val words = assets.open("ml_words.tsv").bufferedReader().useLines {
                 WordFrequencies.fromTsv(it + extra.asSequence())
             }
-            suggester = MalayalamSuggester(MalayalamEngine(rules), words, userWords = ml)
+            // English words typed in Malayalam mode, written the Malayali way (four → ഫോർ).
+            val englishInMl = assets.open("en_ml_words.tsv").bufferedReader().useLines {
+                EnglishInMalayalam.fromTsv(it)
+            }
+            suggester = MalayalamSuggester(MalayalamEngine(rules), words, userWords = ml, english = englishInMl)
             // Ezhuthola's own chat words (bro, tbh, ngl) are merged into the subtitle list.
             // Manglish chat words (machane, kazhicho, vave) join them: never corrected, suggested.
             val enExtra = assets.open("en_extra_words.tsv").bufferedReader().use { it.readLines() } +

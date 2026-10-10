@@ -36,4 +36,49 @@ class MalayalamSuggesterTest {
         // A name that isn't in the word list: the engine's own spelling is used.
         assertEquals("രാഗെശ്", best("raagesh"))
     }
+
+    // ---- English words typed in Malayalam mode ------------------------------------
+
+    private val withEnglish = MalayalamSuggester(
+        MalayalamEngine(MalayalamRules.fromJson(javaClass.getResource("/ezhuthola_rules.json")!!.readText())),
+        WordFrequencies.fromTsv(javaClass.getResource("/ml_words.tsv")!!.readText().lineSequence()),
+        english = EnglishInMalayalam.fromTsv(javaClass.getResource("/en_ml_words.tsv")!!.readText().lineSequence())
+    )
+
+    private fun en(typed: String) = withEnglish.suggest(typed).best
+
+    @Test fun englishWordsAreWrittenTheMalayaliWay() {
+        val expected = mapOf(
+            "media" to "മീഡിയ", "one" to "വൺ", "two" to "ടു", "four" to "ഫോർ", "five" to "ഫൈവ്",
+            "eight" to "എയ്റ്റ്", "nine" to "നൈൻ", "twelve" to "ട്വെൽവ്", "and" to "ആൻഡ്",
+            "more" to "മോർ", "first" to "ഫസ്റ്റ്", "lady" to "ലേഡി", "this" to "ദിസ്", "is" to "ഈസ്",
+            "important" to "ഇമ്പോർട്ടന്റ്", "we" to "വി", "need" to "നീഡ്", "to" to "ടു", "fix" to "ഫിക്സ്",
+            "it" to "ഇറ്റ്", "phone" to "ഫോൺ", "school" to "സ്കൂൾ", "whatsapp" to "വാട്സാപ്പ്",
+        )
+        for ((typed, malayalam) in expected) assertEquals(malayalam, en(typed), typed)
+        assertEquals("ഫോർ", en("Four"))   // auto-capital
+    }
+
+    @Test fun manglishWordsStayMalayalam() {
+        // Also English words, but much more common as Manglish: the Malayalam word stays first.
+        assertEquals("മോൻ", en("mon"))
+        assertEquals("ഇവൻ", en("ivan"))
+        assertEquals("മോളെ", en("mole"))
+        assertEquals("കളി", en("kali"))
+        assertEquals("നീ", en("nee"))
+        // Ordinary Manglish is untouched.
+        assertEquals("ഞാൻ", en("njan"))
+        assertEquals("അമ്മ", en("amma"))
+        assertEquals("എന്റെ", en("ente"))
+    }
+
+    @Test fun englishSpellingIsAlwaysOffered() {
+        // Malayalam first, the English spelling right after it: one tap away.
+        val mon = withEnglish.suggest("mon").words
+        assertEquals("മോൻ", mon[0])
+        assertEquals("മോൺ", mon[1])
+        val ivan = withEnglish.suggest("ivan").words
+        assertEquals("ഇവൻ", ivan[0])
+        assertEquals("ഐവൻ", ivan[1])
+    }
 }

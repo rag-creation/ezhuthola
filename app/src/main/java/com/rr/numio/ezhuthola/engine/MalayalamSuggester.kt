@@ -12,6 +12,11 @@ class WordFrequencies(private val counts: LinkedHashMap<String, Int>) {
 
     val size: Int get() = counts.size
 
+    /** All counts added up: lets a count be compared with another word list's ("per million"). */
+    val total: Long by lazy { counts.values.sumOf { it.toLong() } }
+
+    fun perMillion(word: String): Float = if (total == 0L) 0f else of(word) * 1_000_000f / total
+
     /** Words in file order (most common first). */
     val words: Set<String> get() = counts.keys
 
@@ -49,12 +54,16 @@ data class Suggestions(
  * 4. Words the list doesn't have are built from a real base word + ending ([SuffixSplitter]):
  *    "achanodu" → അച്ഛൻ + ോട് → അച്ഛനോട്.
  * 5. Words this person picked before ([userWords]) come first, most-picked first.
+ * 6. English words typed in Malayalam mode are written the Malayali way ([english]):
+ *    "four" → ഫോർ, not പോർ. The English spelling comes first when the English word is clearly
+ *    more common than the Malayalam reading; otherwise it's offered second ("mon" stays മോൻ).
  */
 class MalayalamSuggester(
     private val engine: MalayalamEngine,
     private val frequencies: WordFrequencies,
     private val maxShown: Int = 5,
     private val userWords: UserWords = UserWords(),
+    private val english: EnglishInMalayalam? = null,
 ) {
     /** Loose key → real words with that key, most common first (max 4 each). */
     private val looseIndex: Map<String, List<String>> = buildMap<String, MutableList<String>> {
@@ -69,7 +78,9 @@ class MalayalamSuggester(
         pool(manglish).map { it to frequencies.of(it) }.filter { it.second > 0 }.sortedByDescending { it.second }
     })
 
-    fun suggest(typed: String): Suggestions {
+    fun suggest(typed: String): Suggestions = suggest(typed, withEnglish = true)
+
+    private fun suggest(typed: String, withEnglish: Boolean): Suggestions {
         if (typed.isEmpty()) return Suggestions("", "", emptyList())
         val pool = pool(typed)
 
@@ -79,9 +90,22 @@ class MalayalamSuggester(
         fun score(word: String) = maxOf(frequencies.of(word), built[word] ?: 0)
 
         // Sorting is stable: equally-common words keep the engine's order.
-        val ranked = pool.sortedWith(
+        var ranked = pool.sortedWith(
             compareByDescending<String> { userWords.count(it) }.thenByDescending(::score)
         ).take(maxShown)
+
+        // An English word ("four", "media"): its Malayali spelling, first or second.
+        val en = if (withEnglish) english?.of(typed) else null
+        if (en != null && typed.length >= 2) {
+            val spelled = en.malayalam
+            val others = ranked.filter { it != spelled }
+            val best = others.firstOrNull()
+            val picked = best != null && userWords.count(best) > userWords.count(spelled)
+            val englishFirst = !picked && (userWords.count(spelled) > 0 || best == null ||
+                prefersEnglish(en.perMillion, frequencies.perMillion(best)))
+            ranked = (if (englishFirst) listOf(spelled) + others else listOf(best!!, spelled) + others.drop(1))
+                .take(maxShown)
+        }
         return Suggestions(typed = typed, best = ranked.first(), words = ranked)
     }
 
@@ -96,11 +120,18 @@ class MalayalamSuggester(
     }
 
     /**
+     * The English reading wins when the Malayalam reading isn't a real word, or when the English
+     * word is used clearly more (four 240/M vs പോർ 81/M) and isn't rare (ammo 5/M stays അമ്മോ).
+     */
+    private fun prefersEnglish(englishPerMillion: Float, malayalamPerMillion: Float): Boolean =
+        malayalamPerMillion == 0f || (englishPerMillion >= 20f && englishPerMillion > 2 * malayalamPerMillion)
+
+    /**
      * How often the best Malayalam reading of [typed] is used ("poda" → പോടാ: common).
      * English mode uses this to leave Manglish alone instead of "correcting" it.
      */
     fun commonness(typed: String): Int =
-        if (typed.isEmpty()) 0 else frequencies.of(suggest(typed).best)
+        if (typed.isEmpty()) 0 else frequencies.of(suggest(typed, withEnglish = false).best)
 
     companion object {
         /** Letters Manglish can't tell apart are folded together. */

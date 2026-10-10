@@ -102,6 +102,7 @@ Full details are in [CREDITS.md](CREDITS.md); full licence texts are in the [lic
 | What | By | Licence | Used for |
 |---|---|---|---|
 | [FrequencyWords](https://github.com/hermitdave/FrequencyWords) (from [OpenSubtitles](https://www.opensubtitles.org/), 2018) | Hermit Dave | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | Malayalam and English word frequencies: `ml_words.tsv`, `en_words.tsv` (adapted, so also CC BY-SA 4.0) |
+| [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict) | Carnegie Mellon University | [BSD 2-clause](licenses/CMUdict-BSD.txt) | How English words sound, so English typed in Malayalam mode is spelled the Malayali way (four → ഫോർ): `en_ml_words.tsv` |
 | [ESDB / SCOWL](https://github.com/en-wl/wordlist) (size 60, American and British) | Kevin Atkinson | [ESDB licence](licenses/ESDB-SCOWL.txt) (MIT-like) | Spelling list: rare real English words are left alone, not "corrected": `en_known_words.txt` |
 | [Unicode CLDR](https://github.com/unicode-org/cldr-json) annotations (CLDR 48, English and Malayalam) | Unicode, Inc. | [Unicode License v3](licenses/Unicode-License-v3.txt) | Emoji names and search keywords |
 | [Unicode Emoji](https://github.com/unicode-org/unicodetools) `emoji-test.txt` (Emoji 17.0) | Unicode, Inc. | [Unicode License v3](licenses/Unicode-License-v3.txt) | Emoji list and order: `emoji_keywords.tsv` |
