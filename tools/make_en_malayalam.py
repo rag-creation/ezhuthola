@@ -7,6 +7,7 @@ Input:
   - CMU Pronouncing Dictionary (BSD licence): how each English word sounds.
     https://github.com/cmusphinx/cmudict  (cmudict.dict)
   - app/src/main/assets/en_words.tsv: which English words are common (FrequencyWords, CC BY-SA 4.0).
+  - app/src/main/assets/en_extra_words.tsv: Ezhuthola's own app and phone words (whatsapp, selfie).
   - tools/en_ml_overrides.tsv: Ezhuthola's own hand-written spellings where the rules miss.
 
 Output lines: english<TAB>malayalam<TAB>uses per million (from en_words.tsv).
@@ -356,6 +357,22 @@ def main():
         else:
             continue
         rows.append(f"{w}\t{ml}\t{c / total * 1e6:.1f}")
+    # Ezhuthola's own English extras (app and phone words: whatsapp, instagram, selfie…),
+    # which the 2018 subtitle list barely has.
+    have = {r.split("\t")[0] for r in rows}
+    for line in open(ASSETS / "en_extra_words.tsv", encoding="utf-8"):
+        w, _, c = line.rstrip("\n").partition("\t")
+        w = w.strip().lower()
+        if not re.fullmatch(r"[a-z]{2,}", w) or w in have:
+            continue
+        if w in overrides:
+            ml = overrides[w]
+        elif w in cmu:
+            ml = to_malayalam(w, pick_pronunciation(cmu[w]))
+        else:
+            continue
+        have.add(w)
+        rows.append(f"{w}\t{ml}\t20.0")   # treated as common: people type these every day
     out = ASSETS / "en_ml_words.tsv"
     out.write_text("\n".join(rows) + "\n", encoding="utf-8")
     print(f"wrote {len(rows)} words to {out}")
