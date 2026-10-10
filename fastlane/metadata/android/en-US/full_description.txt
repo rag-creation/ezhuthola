@@ -9,6 +9,7 @@
 <li>Word suggestions ranked by how often Malayalam words are really used</li>
 <li>Word forms with endings: keralathil → കേരളത്തിൽ</li>
 <li>Learns your words: the spellings you pick come first next time</li>
+<li>English words in Malayalam mode are written the Malayali way: four → ഫോർ, station → സ്റ്റേഷൻ</li>
 </ul>
 
 <p><b>English</b></p>
@@ -17,6 +18,14 @@
 <li>Autocorrect, with backspace to undo it</li>
 <li>Knows chat words like bro, tbh and ngl, and leaves your Manglish alone</li>
 <li>A Missing words list in settings shows words it doesn't know yet, so you can add them</li>
+</ul>
+
+<p><b>Stickers</b></p>
+<ul>
+<li>Make your own from a photo: trace, magic wand, eraser and shapes, with a white border</li>
+<li>Or big Malayalam text stickers in four Malayalam fonts</li>
+<li>Add stickers you already have: pictures, or .wastickers packs</li>
+<li>Sent as real stickers in WhatsApp, made and kept on your phone</li>
 </ul>
 
 <p><b>Everything else</b></p>
@@ -28,6 +37,6 @@
 <li>Number hints on the top row, ₹ on both symbol pages</li>
 </ul>
 
-<p>Word data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles. Emoji names and keywords: Unicode CLDR and Unicode Emoji data (Unicode License v3).</p>
+<p>Word data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles. Emoji names and keywords: Unicode CLDR and Unicode Emoji data (Unicode License v3). English pronunciations: CMU Pronouncing Dictionary (BSD). Sticker fonts: Baloo Chettan 2, Manjari, Gayathri and Chilanka (SIL Open Font License).</p>
 
 <p>Part of Numio, small honest apps made by a Keralite: https://getnumio.org</p>

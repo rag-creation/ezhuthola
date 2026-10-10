@@ -41,6 +41,7 @@ Ezhuthola is different:
 - ✅ Word suggestions ranked by how often Malayalam words are actually used
 - ✅ Word forms with endings: `keralathil` → കേരളത്തിൽ, built from a real base word + ending
 - ✅ Learns your words: the suggestions you pick come first next time
+- ✅ English words are written the Malayali way: `four` → ഫോർ, `station` → സ്റ്റേഷൻ, `media` → മീഡിയ
 
 ### 🔤 English
 - ✅ Word suggestions and completion
@@ -53,6 +54,7 @@ Ezhuthola is different:
 - ✅ One tap to switch: the yellow **ola** key changes between Malayalam and English
 - ✅ Emoji panel (hold the comma key) with **emoji search in English, Manglish and Malayalam** — try `love`, `chiri` or `ചിരി`
 - ✅ Clipboard history: tap to paste, hold to pin or delete. Passwords and OTPs are never saved
+- ✅ **Stickers**: make your own from a photo (trace, magic wand, eraser, shapes) or Malayalam text, add your own pictures or `.wastickers` packs, and send them as real WhatsApp stickers. All offline
 - ✅ Two symbol pages, with ₹ on both
 - ✅ Number hints on the top row
 - ✅ Themes: Numio, Black & White, Light, Blue Night, or **your own photo** (with a dim slider)
@@ -72,7 +74,7 @@ Ezhuthola is different:
 ## 📲 Install
 
 - **GitHub:** download the APK from [Releases](https://github.com/rag-creation/ezhuthola/releases)
-- **F-Droid:** coming soon
+- **F-Droid:** [f-droid.org/packages/com.rr.numio.ezhuthola](https://f-droid.org/packages/com.rr.numio.ezhuthola/)
 
 Then:
 
