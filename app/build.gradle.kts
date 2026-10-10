@@ -20,6 +20,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Test builds install next to the real Ezhuthola instead of replacing it.
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-test"
+        }
         release {
             // R8: shrinks unused library code (about 11 MB → a few MB) and starts faster
             optimization {

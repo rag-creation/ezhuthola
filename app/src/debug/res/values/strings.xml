@@ -1,0 +1,4 @@
+<resources>
+    <!-- Test builds install next to the real app, so give them their own name. -->
+    <string name="app_name">Ezhuthola Test</string>
+</resources>
