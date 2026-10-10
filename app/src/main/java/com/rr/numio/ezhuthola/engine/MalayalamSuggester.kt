@@ -105,6 +105,13 @@ class MalayalamSuggester(
             compareByDescending<String> { userWords.count(it) }.thenByDescending(::score)
         ).take(maxShown)
 
+        // Chat shortcuts: "aan" is almost always ആണ് (is), rarely ആൺ (male).
+        CHAT_SHORTCUTS[typed.lowercase()]?.let { word ->
+            if (ranked.none { userWords.count(it) > userWords.count(word) }) {
+                ranked = (listOf(word) + ranked.filter { it != word }).take(maxShown)
+            }
+        }
+
         // An English word ("four", "media"): its Malayali spelling, first or second.
         val en = if (withEnglish) english?.of(typed) else null
         if (en != null && typed.length >= 2) {
@@ -146,6 +153,9 @@ class MalayalamSuggester(
 
     companion object {
         private const val VIRAMA = "\u0D4D"
+
+        /** Manglish chat spellings that mean a different word than the letters say. */
+        private val CHAT_SHORTCUTS = mapOf("aan" to "ആണ്")
 
         /** ന → ൻ, ണ → ൺ, ര → ർ, ല → ൽ, ള → ൾ */
         private val CHILLU_OF = mapOf('ന' to 'ൻ', 'ണ' to 'ൺ', 'ര' to 'ർ', 'ല' to 'ൽ', 'ള' to 'ൾ')

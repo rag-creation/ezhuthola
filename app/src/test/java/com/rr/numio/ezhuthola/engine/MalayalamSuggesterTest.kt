@@ -28,7 +28,11 @@ class MalayalamSuggesterTest {
 
     @Test fun typedUNeverEndsInChillu() {
         assertEquals("ആണ്", best("aanu"))     // "is", not ആൺ (male)
-        assertEquals("ആൺ", best("aan"))
+        assertEquals("ആണ്", best("aan"))      // chat: "aan" means "is"
+        assert("ആൺ" in suggester.suggest("aan").words)  // "male" still one tap away
+        assertEquals("അവൻ", best("avan"))     // other words ending in n keep their chillu
+        assertEquals("ഇവൻ", best("ivan"))
+        assertEquals("ഞാൻ", best("njan"))
         assertEquals("കണ്ടു", best("kandu"))   // no chillu twin: unchanged
     }
 
