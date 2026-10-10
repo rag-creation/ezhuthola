@@ -1,0 +1,38 @@
+# One-off helper: copies the Malayalam sticker fonts (all SIL Open Font License)
+# from the Google Fonts repository into the app, with their licence files.
+name: Fetch sticker fonts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fonts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download fonts
+        run: |
+          set -e
+          base=https://raw.githubusercontent.com/google/fonts/main/ofl
+          mkdir -p app/src/main/assets/fonts licenses
+          get() { curl -fsSL "$base/$1" -o "$2"; echo "got $2 ($(stat -c%s "$2") bytes)"; }
+          get "balooChettan2/BalooChettan2%5Bwght%5D.ttf" app/src/main/assets/fonts/BalooChettan2.ttf
+          get "balooChettan2/OFL.txt"  licenses/OFL-BalooChettan2.txt
+          get "manjari/Manjari-Bold.ttf" app/src/main/assets/fonts/Manjari-Bold.ttf
+          get "manjari/OFL.txt"  licenses/OFL-Manjari.txt
+          get "chilanka/Chilanka-Regular.ttf" app/src/main/assets/fonts/Chilanka-Regular.ttf
+          get "chilanka/OFL.txt" licenses/OFL-Chilanka.txt
+          get "karumbi/Karumbi-Regular.ttf" app/src/main/assets/fonts/Karumbi-Regular.ttf
+          get "karumbi/OFL.txt"  licenses/OFL-Karumbi.txt
+          get "gayathri/Gayathri-Bold.ttf" app/src/main/assets/fonts/Gayathri-Bold.ttf
+          get "gayathri/OFL.txt" licenses/OFL-Gayathri.txt
+      - name: Commit
+        run: |
+          git config user.name rag-creation
+          git config user.email 240880224+rag-creation@users.noreply.github.com
+          git add app/src/main/assets/fonts licenses
+          git commit -m "Add Malayalam sticker fonts (SIL Open Font License)"
+          git push
