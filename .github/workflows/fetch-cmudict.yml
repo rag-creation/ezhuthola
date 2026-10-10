@@ -1,0 +1,23 @@
+# Temporary helper: copies the CMU Pronouncing Dictionary (BSD licence) into this branch.
+name: Fetch cmudict
+on:
+  push:
+    branches: [cmudict-data]
+    paths: [.github/workflows/fetch-cmudict.yml]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: |
+          mkdir -p tools/data
+          curl -fsSL https://raw.githubusercontent.com/cmusphinx/cmudict/master/cmudict.dict -o tools/data/cmudict.dict
+          curl -fsSL https://raw.githubusercontent.com/cmusphinx/cmudict/master/LICENSE -o tools/data/cmudict-LICENSE.txt
+          echo "::notice::$(wc -l < tools/data/cmudict.dict) lines"
+          git config user.name rag-creation
+          git config user.email 240880224+rag-creation@users.noreply.github.com
+          git add tools/data
+          git commit -m "CMU Pronouncing Dictionary (temporary, for building the English word table)"
+          git push
