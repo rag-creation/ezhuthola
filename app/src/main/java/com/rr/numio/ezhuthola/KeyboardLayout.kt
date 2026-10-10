@@ -887,19 +887,15 @@ private fun EnterIcon(color: Color) {
 @Composable
 private fun SmileHint(color: Color) = SmileIcon(color, Modifier.size(17.dp))
 
-/** Outline smiley: the comma key's hint, and the "back to emoji" key in search. */
+/** Emoji: an angular face with square eyes and a yellow smile (monochrome unless [accent] is given). */
 @Composable
-private fun SmileIcon(color: Color, modifier: Modifier) {
+private fun SmileIcon(color: Color, modifier: Modifier, accent: Color = color) {
     Canvas(modifier) {
         val u = size.width / 24f
-        val stroke = Stroke(width = 2f * u, cap = StrokeCap.Round)
-        drawCircle(color, radius = 10 * u, center = Offset(12 * u, 12 * u), style = stroke)
-        drawPath(Path().apply {
-            moveTo(7.5f * u, 14 * u)
-            quadraticTo(12 * u, 18.5f * u, 16.5f * u, 14 * u)
-        }, color, style = stroke)
-        drawCircle(color, radius = 1.4f * u, center = Offset(9 * u, 9.5f * u))
-        drawCircle(color, radius = 1.4f * u, center = Offset(15 * u, 9.5f * u))
+        drawPath(Path().apply { moveTo(8.14f * u, 2.80f * u); lineTo(15.86f * u, 2.80f * u); lineTo(21.20f * u, 8.14f * u); lineTo(21.20f * u, 15.86f * u); lineTo(15.86f * u, 21.20f * u); lineTo(8.14f * u, 21.20f * u); lineTo(2.80f * u, 15.86f * u); lineTo(2.80f * u, 8.14f * u); close() }, color, style = Stroke(1.60f * u, join = StrokeJoin.Miter, cap = StrokeCap.Butt))
+        drawPath(Path().apply { moveTo(8.60f * u, 8.80f * u); lineTo(10.40f * u, 8.80f * u); lineTo(10.40f * u, 10.80f * u); lineTo(8.60f * u, 10.80f * u); close() }, color)
+        drawPath(Path().apply { moveTo(13.60f * u, 8.80f * u); lineTo(15.40f * u, 8.80f * u); lineTo(15.40f * u, 10.80f * u); lineTo(13.60f * u, 10.80f * u); close() }, color)
+        drawPath(Path().apply { moveTo(7.40f * u, 13.20f * u); lineTo(16.60f * u, 13.20f * u); lineTo(14.20f * u, 16.60f * u); lineTo(9.80f * u, 16.60f * u); close() }, accent)
     }
 }
 
@@ -1002,7 +998,7 @@ private fun IdleStrip(
         verticalAlignment = Alignment.CenterVertically
     ) {
         StripButton(onOpenSettings) { SettingsIcon(HintText, Modifier.size(24.dp)) }
-        StripButton(onOpenEmoji) { SmileIcon(HintText, Modifier.size(24.dp)) }
+        StripButton(onOpenEmoji) { SmileIcon(HintText, Modifier.size(24.dp), accent = Accent) }
         Spacer(Modifier.weight(1f))
         StripButton(onOpenStickers) { StickerIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenClipboard) { ClipboardIcon(HintText, Modifier.size(24.dp)) }
@@ -1025,21 +1021,24 @@ private fun StripButton(onClick: () -> Unit, icon: @Composable () -> Unit) {
     ) { icon() }
 }
 
-/** Gear: "settings". Eight teeth around a solid ring with a hole in the middle. */
+/** Settings: a gear with the Numio N. inside, from RR's design. */
 @Composable
-private fun SettingsIcon(color: Color, modifier: Modifier) {
+private fun SettingsIcon(color: Color, modifier: Modifier, accent: Color = Accent) {
     Canvas(modifier) {
         val u = size.width / 24f
-        val c = Offset(12 * u, 12 * u)
-        for (i in 0 until 8) {
-            rotate(i * 45f, pivot = c) {
-                drawRoundRect(
-                    color, Offset(10.4f * u, 1.6f * u), Size(3.2f * u, 4.4f * u),
-                    CornerRadius(0.8f * u, 0.8f * u)
-                )
-            }
-        }
-        drawCircle(color, 5.9f * u, c, style = Stroke(5f * u))   // solid body, hole in the middle
+        drawPath(Path().apply { moveTo(10.00f * u, 1.00f * u); lineTo(14.00f * u, 1.00f * u); lineTo(15.10f * u, 4.00f * u); lineTo(8.90f * u, 4.00f * u); close() }, color)
+        drawPath(Path().apply { moveTo(18.36f * u, 2.81f * u); lineTo(21.19f * u, 5.64f * u); lineTo(19.85f * u, 8.54f * u); lineTo(15.46f * u, 4.15f * u); close() }, color)
+        drawPath(Path().apply { moveTo(23.00f * u, 10.00f * u); lineTo(23.00f * u, 14.00f * u); lineTo(20.00f * u, 15.10f * u); lineTo(20.00f * u, 8.90f * u); close() }, color)
+        drawPath(Path().apply { moveTo(21.19f * u, 18.36f * u); lineTo(18.36f * u, 21.19f * u); lineTo(15.46f * u, 19.85f * u); lineTo(19.85f * u, 15.46f * u); close() }, color)
+        drawPath(Path().apply { moveTo(14.00f * u, 23.00f * u); lineTo(10.00f * u, 23.00f * u); lineTo(8.90f * u, 20.00f * u); lineTo(15.10f * u, 20.00f * u); close() }, color)
+        drawPath(Path().apply { moveTo(5.64f * u, 21.19f * u); lineTo(2.81f * u, 18.36f * u); lineTo(4.15f * u, 15.46f * u); lineTo(8.54f * u, 19.85f * u); close() }, color)
+        drawPath(Path().apply { moveTo(1.00f * u, 14.00f * u); lineTo(1.00f * u, 10.00f * u); lineTo(4.00f * u, 8.90f * u); lineTo(4.00f * u, 15.10f * u); close() }, color)
+        drawPath(Path().apply { moveTo(2.81f * u, 5.64f * u); lineTo(5.64f * u, 2.81f * u); lineTo(8.54f * u, 4.15f * u); lineTo(4.15f * u, 8.54f * u); close() }, color)
+        drawCircle(color, 8.35f * u, Offset(12.00f * u, 12.00f * u), style = Stroke(2.60f * u))
+        drawCircle(accent, 6.50f * u, Offset(12.00f * u, 12.00f * u), style = Stroke(0.60f * u))
+        drawPath(Path().apply { moveTo(8.45f * u, 8.64f * u); lineTo(11.42f * u, 10.98f * u); lineTo(10.07f * u, 12.03f * u); lineTo(10.07f * u, 15.46f * u); lineTo(8.45f * u, 15.46f * u); close() }, accent)
+        drawPath(Path().apply { moveTo(12.66f * u, 8.84f * u); lineTo(14.37f * u, 8.84f * u); lineTo(14.37f * u, 15.66f * u); lineTo(11.20f * u, 13.10f * u); lineTo(12.66f * u, 11.81f * u); close() }, accent)
+        drawCircle(color, 0.82f * u, Offset(15.88f * u, 13.46f * u))
     }
 }
 
@@ -1403,28 +1402,15 @@ private fun StickerCell(file: File, isSelected: Boolean, onTap: () -> Unit, onHo
     }
 }
 
-/** Square sticker with its corner peeling up. */
+/** Sticker: a chamfered square with its corner peeling up in yellow. */
 @Composable
-private fun StickerIcon(color: Color, modifier: Modifier) {
+private fun StickerIcon(color: Color, modifier: Modifier, accent: Color = Accent) {
     Canvas(modifier) {
         val u = size.width / 24f
-        val stroke = Stroke(width = 1.9f * u, join = StrokeJoin.Round, cap = StrokeCap.Round)
-        drawPath(Path().apply {
-            moveTo(15 * u, 20 * u)
-            lineTo(7 * u, 20 * u)
-            quadraticTo(4 * u, 20 * u, 4 * u, 17 * u)
-            lineTo(4 * u, 7 * u)
-            quadraticTo(4 * u, 4 * u, 7 * u, 4 * u)
-            lineTo(17 * u, 4 * u)
-            quadraticTo(20 * u, 4 * u, 20 * u, 7 * u)
-            lineTo(20 * u, 15 * u)
-            close()
-        }, color, style = stroke)
-        drawPath(Path().apply {
-            moveTo(20 * u, 15 * u)
-            lineTo(16 * u, 15 * u)
-            quadraticTo(15 * u, 15 * u, 15 * u, 16 * u)
-            lineTo(15 * u, 20 * u)
-        }, color, style = stroke)
+        drawPath(Path().apply { moveTo(15.20f * u, 20.40f * u); lineTo(5.40f * u, 20.40f * u); lineTo(3.60f * u, 18.60f * u); lineTo(3.60f * u, 5.40f * u); lineTo(5.40f * u, 3.60f * u); lineTo(18.60f * u, 3.60f * u); lineTo(20.40f * u, 5.40f * u); lineTo(20.40f * u, 15.20f * u) }, color, style = Stroke(1.60f * u, join = StrokeJoin.Miter, cap = StrokeCap.Butt))
+        drawPath(Path().apply { moveTo(20.40f * u, 15.20f * u); lineTo(15.20f * u, 20.40f * u); lineTo(15.20f * u, 15.20f * u); close() }, accent)
+        drawPath(Path().apply { moveTo(8.20f * u, 8.00f * u); lineTo(10.00f * u, 8.00f * u); lineTo(10.00f * u, 9.80f * u); lineTo(8.20f * u, 9.80f * u); close() }, color)
+        drawPath(Path().apply { moveTo(14.00f * u, 8.00f * u); lineTo(15.80f * u, 8.00f * u); lineTo(15.80f * u, 9.80f * u); lineTo(14.00f * u, 9.80f * u); close() }, color)
+        drawPath(Path().apply { moveTo(8.20f * u, 12.60f * u); lineTo(10.40f * u, 14.40f * u); lineTo(13.60f * u, 14.40f * u) }, color, style = Stroke(1.40f * u, join = StrokeJoin.Miter, cap = StrokeCap.Butt))
     }
 }
