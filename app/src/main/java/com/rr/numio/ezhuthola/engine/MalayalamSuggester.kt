@@ -100,8 +100,14 @@ class MalayalamSuggester(
             pool.removeAll(chillus.toSet())
             for (word in chillus) pool += word.dropLast(1) + LETTER_OF.getValue(word.last()) + VIRAMA
         }
+        // Words the letters spell exactly beat loose look-alikes unless those are 5× as common:
+        // kutti is കുട്ടി (586), not കൂടി (1652). Loose matching rescues misspellings; it
+        // shouldn't override a word typed right.
+        val exact = engine.transliterate(typed).candidates.toHashSet()
+        val exactIsReal = exact.any { frequencies.of(it) > 0 }
         fun score(word: String): Int {
-            val own = maxOf(frequencies.of(word), built[word] ?: 0)
+            val own0 = maxOf(frequencies.of(word), built[word] ?: 0)
+            val own = if (exactIsReal && word !in exact && word !in built) own0 / LOOSE_PENALTY else own0
             if (!endsInU || !word.endsWith(VIRAMA) || word.length < 2) return own
             val chillu = CHILLU_OF[word[word.length - 2]] ?: return own
             return maxOf(own, frequencies.of(word.dropLast(2) + chillu))
@@ -161,6 +167,9 @@ class MalayalamSuggester(
     companion object {
         private const val VIRAMA = "\u0D4D"
 
+        /** How much more common a loose look-alike must be to beat the word the letters spell. */
+        private const val LOOSE_PENALTY = 5
+
         /** Manglish chat spellings that mean a different word than the letters say. */
         private val CHAT_SHORTCUTS = mapOf("aan" to "ആണ്")
 
@@ -219,7 +228,7 @@ class MalayalamSuggester(
             "ച്ഛ" to "ച", "ച്ച" to "ച",
             "ങ്ക" to "ങ", "ങ്ങ" to "ങ",     // bhayangara → ഭയങ്കര
             "ഷ്ട്ട" to "ഷ്ട",                 // ishttam → ഇഷ്ടം
-            "റ്റ" to "ട്ട",                    // mattoru → മറ്റൊരു: Manglish tt is often റ്റ
+
             "\u0D4D\u0D30\u0D41" to "\u0D43", "\u0D4D\u0D30\u0D3F" to "\u0D43", // ്രു, ്രി → ൃ
         )
 
@@ -229,9 +238,13 @@ class MalayalamSuggester(
          */
         private val doubleTha = Regex("(?<=.)ത്ത(?!്$)")
 
+        /** Manglish "tt" inside a word is often റ്റ: mattoru → മറ്റൊരു. Not at the end ("but" ≠ ബൂത്ത്). */
+        private val rtta = Regex("റ്റ(?!്$)")
+
         fun looseKey(word: String): String {
             var w = word
             for ((from, to) in foldPairs) if (from in w) w = w.replace(from, to)
+            if ("റ്റ" in w) w = w.replace(rtta, "ട്ട")
             if ("ത്ത" in w) w = w.replace(doubleTha, "ത")
             return buildString(w.length) {
                 for (c in w) append(fold[c] ?: c)
