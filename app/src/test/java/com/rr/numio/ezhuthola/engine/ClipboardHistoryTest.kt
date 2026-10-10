@@ -56,11 +56,12 @@ class ClipboardHistoryTest {
         assertEquals(listOf(true, false), loaded.all(3).map { it.pinned })
     }
 
-    @Test fun savedRecentClipsStillExpireAfterAnHour() {
+    @Test fun savedRecentClipsComeBackHoursLater() {
+        // Samsung closes the keyboard; hours later the clips are still there.
         val h = ClipboardHistory()
         h.add("old", 0)
         val back = ClipboardHistory.recentFromText(h.recentToText(1))
-        assertEquals(emptyList(), back.all(2 * 60 * 60_000L).map { it.text })
+        assertEquals(listOf("old"), back.all(10 * hour).map { it.text })
     }
 
     @Test fun mergeKeepsWhatWasCopiedWhileLoading() {
