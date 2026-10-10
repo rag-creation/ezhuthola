@@ -161,10 +161,14 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         prefs.registerOnSharedPreferenceChangeListener(lookListener)
 
         Thread {
+            // Pinned clips, plus recent ones saved before Android last closed the keyboard.
             val pinned = File(filesDir, CLIPS_FILE)
-            if (pinned.exists()) {
-                val loaded = ClipboardHistory.fromText(pinned.readText())
-                mainHandler.post { history = loaded }
+            val recent = File(filesDir, RECENT_CLIPS_FILE)
+            val loaded = ClipboardHistory.fromText(if (pinned.exists()) pinned.readText() else "")
+            if (recent.exists()) loaded.mergeFrom(ClipboardHistory.recentFromText(recent.readText()), now())
+            mainHandler.post {
+                history.mergeFrom(loaded, now())
+                clips = history.all(now())
             }
             val ml = readUserWords(ML_USER_FILE)
             val en = readUserWords(LearnedWords.TAUGHT_FILE)
@@ -222,7 +226,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     onPasteClip = ::pasteClip,
                     onTogglePin = { history.togglePin(it); clips = history.all(now()); saveClips() },
                     onDeleteClip = { history.delete(it); clips = history.all(now()); saveClips() },
-                    onClearClips = { history.clearUnpinned(); clips = history.all(now()) },
+                    onClearClips = { history.clearUnpinned(); clips = history.all(now()); saveClips() },
                     onOpenSettings = ::openSettings,
                     onSwitchKeyboard = {
                         getSystemService(InputMethodManager::class.java).showInputMethodPicker()
@@ -571,7 +575,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         )
         clipboardOn = prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)
         if (!clipboardOn) {
-            history.clearUnpinned()
+            if (history.all(now()).any { !it.pinned }) { history.clearUnpinned(); saveClips() }
             clips = history.all(now())
         }
         // Load the photo only when the photo theme is on, and again only if it changed.
@@ -613,6 +617,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         lastClipText = text
         history.add(text, now())
         clips = history.all(now())
+        saveClips()
     }
 
     /**
@@ -624,8 +629,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         val text = readClipboard() ?: return
         if (text == lastClipText) return // already have it, or it was deleted on purpose
         lastClipText = text
+        // Already in the list (saved before Android closed the keyboard)? Leave it where it is.
+        if (history.all(now()).any { it.text == text }) return
         history.add(text, now())
         clips = history.all(now())
+        saveClips()
     }
 
     /** The copied text, or null for nothing / passwords / OTPs / history switched off. */
@@ -647,11 +655,18 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         commit(text)
     }
 
-    /** Only pinned clips are written to storage. */
+    /**
+     * Pinned clips, and recent ones, are written to the app's private storage. Recent clips are
+     * saved too because Android (Samsung especially) closes keyboards in the background, which
+     * used to wipe the list. They still expire after an hour, like before.
+     */
     private fun saveClips() {
-        if (!history.dirty) return
-        val text = history.toText()
-        Thread { File(filesDir, CLIPS_FILE).writeText(text) }.start()
+        val pinnedText = if (history.dirty) history.toText() else null
+        val recentText = history.recentToText(now())
+        fileWriter.execute {
+            pinnedText?.let { File(filesDir, CLIPS_FILE).writeText(it) }
+            File(filesDir, RECENT_CLIPS_FILE).writeText(recentText)
+        }
     }
 
     private fun now() = System.currentTimeMillis()
@@ -812,5 +827,6 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         const val MAX_WORD = 30
         const val ML_USER_FILE = "user_words_ml.tsv"
         const val CLIPS_FILE = "pinned_clips.txt"
+        const val RECENT_CLIPS_FILE = "recent_clips.txt"
     }
 }

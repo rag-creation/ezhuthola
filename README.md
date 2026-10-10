@@ -85,7 +85,7 @@ Requires Android 8.0 (Oreo) or newer.
 ## 🔒 Privacy
 
 Ezhuthola asks for **no Android permissions**. It cannot reach the internet, so it cannot send anything anywhere.
-Learned words, pinned clips and settings are stored only on your phone, inside the app.
+Learned words, clipboard clips (pinned ones, and recent ones for up to an hour) and settings are stored only on your phone, inside the app.
 Uninstalling Ezhuthola removes all of it.
 
 ## 🛠️ Built with

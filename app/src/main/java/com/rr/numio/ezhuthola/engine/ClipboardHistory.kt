@@ -8,7 +8,8 @@ data class Clip(val text: String, val time: Long, val pinned: Boolean = false)
  *
  * - Newest first; pinned clips stay at the top and never expire.
  * - Unpinned clips disappear after an hour, and only the last [MAX_RECENT] are kept.
- * - Only pinned clips are saved to storage ([toText]); the rest live in memory only.
+ * - Pinned clips are saved with [toText], recent ones with [recentToText] (kept in the app's
+ *   private storage so they survive Android closing the keyboard; still gone after an hour).
  */
 class ClipboardHistory(clips: List<Clip> = emptyList()) {
 
@@ -51,6 +52,24 @@ class ClipboardHistory(clips: List<Clip> = emptyList()) {
         if (removed.pinned) dirty = true
     }
 
+    /** Recent (unpinned) clips as text, same format as [toText]. */
+    fun recentToText(now: Long): String {
+        prune(now)
+        return list.filter { !it.pinned }.joinToString("\n") { "${it.time}\t${escape(it.text)}" }
+    }
+
+    /**
+     * Adds clips read back from storage, without overwriting anything already here
+     * (something copied while the files were loading stays on top).
+     */
+    fun mergeFrom(other: ClipboardHistory, now: Long) {
+        for (clip in other.list) {
+            if (list.none { it.text == clip.text }) list.add(clip)
+        }
+        list.sortWith(compareByDescending<Clip> { it.time })
+        prune(now)
+    }
+
     /** "Clear all": removes everything that isn't pinned. */
     fun clearUnpinned() {
         list.removeAll { !it.pinned }
@@ -73,6 +92,10 @@ class ClipboardHistory(clips: List<Clip> = emptyList()) {
         private const val EXPIRE_MS = 60 * 60_000L  // unpinned clips: 1 hour
         private const val MAX_RECENT = 20
         private const val MAX_LENGTH = 5_000
+
+        /** Saved recent clips: like [fromText] but unpinned. */
+        fun recentFromText(text: String): ClipboardHistory =
+            ClipboardHistory(fromText(text).list.map { it.copy(pinned = false) })
 
         fun fromText(text: String): ClipboardHistory = ClipboardHistory(
             text.lineSequence().mapNotNull { line ->
