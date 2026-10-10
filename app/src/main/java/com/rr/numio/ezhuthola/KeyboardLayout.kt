@@ -287,7 +287,8 @@ private fun KeyboardContent(
             IdleStrip(
                 onOpenSettings = onOpenSettings,
                 onOpenClipboard = { onOpenClipboard(); clipboardOpen = true },
-                onOpenStickers = { onOpenStickers(); stickersOpen = true }
+                onOpenStickers = { onOpenStickers(); stickersOpen = true },
+                onOpenEmoji = { emojiOpen = true }
             )
         } else {
             SuggestionStrip(suggestions, onPick)
@@ -985,9 +986,14 @@ private fun Chip(
 // Clipboard
 // ---------------------------------------------------------------------------
 
-/** Strip when no word is being typed: settings on the left, stickers and clipboard on the right. */
+/** Strip when no word is being typed: settings and emoji on the left, stickers and clipboard on the right. */
 @Composable
-private fun IdleStrip(onOpenSettings: () -> Unit, onOpenClipboard: () -> Unit, onOpenStickers: () -> Unit) {
+private fun IdleStrip(
+    onOpenSettings: () -> Unit,
+    onOpenClipboard: () -> Unit,
+    onOpenStickers: () -> Unit,
+    onOpenEmoji: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -996,6 +1002,7 @@ private fun IdleStrip(onOpenSettings: () -> Unit, onOpenClipboard: () -> Unit, o
         verticalAlignment = Alignment.CenterVertically
     ) {
         StripButton(onOpenSettings) { SettingsIcon(HintText, Modifier.size(24.dp)) }
+        StripButton(onOpenEmoji) { SmileIcon(HintText, Modifier.size(24.dp)) }
         Spacer(Modifier.weight(1f))
         StripButton(onOpenStickers) { StickerIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenClipboard) { ClipboardIcon(HintText, Modifier.size(24.dp)) }
@@ -1018,18 +1025,21 @@ private fun StripButton(onClick: () -> Unit, icon: @Composable () -> Unit) {
     ) { icon() }
 }
 
-/** Two slider lines: "settings". */
+/** Gear: "settings". Eight teeth around a solid ring with a hole in the middle. */
 @Composable
 private fun SettingsIcon(color: Color, modifier: Modifier) {
     Canvas(modifier) {
         val u = size.width / 24f
-        val w = 1.8f * u
-        drawLine(color, Offset(4 * u, 7 * u), Offset(14 * u, 7 * u), w, StrokeCap.Round)
-        drawLine(color, Offset(18 * u, 7 * u), Offset(20 * u, 7 * u), w, StrokeCap.Round)
-        drawLine(color, Offset(4 * u, 17 * u), Offset(8 * u, 17 * u), w, StrokeCap.Round)
-        drawLine(color, Offset(12 * u, 17 * u), Offset(20 * u, 17 * u), w, StrokeCap.Round)
-        drawCircle(color, 2 * u, Offset(16 * u, 7 * u), style = Stroke(w))
-        drawCircle(color, 2 * u, Offset(10 * u, 17 * u), style = Stroke(w))
+        val c = Offset(12 * u, 12 * u)
+        for (i in 0 until 8) {
+            rotate(i * 45f, pivot = c) {
+                drawRoundRect(
+                    color, Offset(10.4f * u, 1.6f * u), Size(3.2f * u, 4.4f * u),
+                    CornerRadius(0.8f * u, 0.8f * u)
+                )
+            }
+        }
+        drawCircle(color, 5.9f * u, c, style = Stroke(5f * u))   // solid body, hole in the middle
     }
 }
 
