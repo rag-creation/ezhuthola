@@ -3,7 +3,9 @@
 name: Fetch sticker fonts
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [stickers]
+    paths: [.github/workflows/fetch-fonts.yml]
 
 permissions:
   contents: write
