@@ -16,21 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download fonts
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          base=https://raw.githubusercontent.com/google/fonts/main/ofl
           mkdir -p app/src/main/assets/fonts licenses
-          get() { curl -fsSL "$base/$1" -o "$2"; echo "got $2 ($(stat -c%s "$2") bytes)"; }
-          get "balooChettan2/BalooChettan2%5Bwght%5D.ttf" app/src/main/assets/fonts/BalooChettan2.ttf
-          get "balooChettan2/OFL.txt"  licenses/OFL-BalooChettan2.txt
-          get "manjari/Manjari-Bold.ttf" app/src/main/assets/fonts/Manjari-Bold.ttf
-          get "manjari/OFL.txt"  licenses/OFL-Manjari.txt
-          get "chilanka/Chilanka-Regular.ttf" app/src/main/assets/fonts/Chilanka-Regular.ttf
-          get "chilanka/OFL.txt" licenses/OFL-Chilanka.txt
-          get "karumbi/Karumbi-Regular.ttf" app/src/main/assets/fonts/Karumbi-Regular.ttf
-          get "karumbi/OFL.txt"  licenses/OFL-Karumbi.txt
-          get "gayathri/Gayathri-Bold.ttf" app/src/main/assets/fonts/Gayathri-Bold.ttf
-          get "gayathri/OFL.txt" licenses/OFL-Gayathri.txt
+          for dir in balooChettan2 manjari chilanka karumbi gayathri; do
+            gh api "repos/google/fonts/contents/ofl/$dir" --jq '.[] | select(.name | endswith(".ttf") or . == "OFL.txt") | "\(.name)\t\(.download_url)"' |
+            while IFS=$'\t' read -r name url; do
+              if [ "$name" = "OFL.txt" ]; then out="licenses/OFL-$dir.txt"; else out="app/src/main/assets/fonts/$(echo "$name" | tr -d '[]' | sed 's/,/-/g')"; fi
+              curl -fsSL "$url" -o "$out"
+              echo "::notice::$out $(stat -c%s "$out") bytes"
+            done
+          done
       - name: Commit
         run: |
           git config user.name rag-creation
