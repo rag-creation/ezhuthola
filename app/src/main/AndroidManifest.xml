@@ -24,6 +24,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".StickerMakerActivity"
+            android:exported="false"
+            android:label="Make a sticker"
+            android:theme="@style/Theme.Ezhuthola"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name=".EzhutholaKeyboardService"
             android:label="@string/app_name"

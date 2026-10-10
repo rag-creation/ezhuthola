@@ -153,7 +153,9 @@ fun KeyboardLayout(
     stickers: List<File> = emptyList(),
     stickerStatus: String? = null,    // "This app doesn't take stickers", shown in the sticker panel
     onOpenStickers: () -> Unit = {},
-    onSendSticker: (File) -> Unit = {}
+    onSendSticker: (File) -> Unit = {},
+    onMakeSticker: () -> Unit = {},
+    onDeleteSticker: (File) -> Unit = {}
 ) {
     CompositionLocalProvider(LocalKeyboardTheme provides theme, LocalKeyFeedback provides feedback) {
         Box(Modifier.fillMaxWidth()) {
@@ -177,7 +179,9 @@ fun KeyboardLayout(
                 stickers = stickers,
                 stickerStatus = stickerStatus,
                 onOpenStickers = onOpenStickers,
-                onSendSticker = onSendSticker
+                onSendSticker = onSendSticker,
+                onMakeSticker = onMakeSticker,
+                onDeleteSticker = onDeleteSticker
             )
         }
     }
@@ -208,7 +212,9 @@ private fun KeyboardContent(
     stickers: List<File> = emptyList(),
     stickerStatus: String? = null,
     onOpenStickers: () -> Unit = {},
-    onSendSticker: (File) -> Unit = {}
+    onSendSticker: (File) -> Unit = {},
+    onMakeSticker: () -> Unit = {},
+    onDeleteSticker: (File) -> Unit = {}
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -267,6 +273,8 @@ private fun KeyboardContent(
                 stickers = stickers,
                 status = stickerStatus,
                 onSend = onSendSticker,
+                onMake = onMakeSticker,
+                onDelete = onDeleteSticker,
                 onBackspace = onBackspace,
                 onSpace = { onText(" ") },
                 onClose = { stickersOpen = false }
@@ -1228,7 +1236,8 @@ private fun PinIcon(color: Color, modifier: Modifier) {
 // ---------------------------------------------------------------------------
 
 /**
- * Sticker panel: opens in place of the keys, like the clipboard. Tap a sticker to send it.
+ * Sticker panel: opens in place of the keys, like the clipboard. Tap a sticker to send it,
+ * hold one to delete it. The first tile opens the sticker maker.
  * WhatsApp gets a real sticker; other apps that take pictures get an image.
  */
 @Composable
@@ -1236,10 +1245,13 @@ private fun StickerPanel(
     stickers: List<File>,
     status: String?,
     onSend: (File) -> Unit,
+    onMake: () -> Unit,
+    onDelete: (File) -> Unit,
     onBackspace: () -> Unit,
     onSpace: () -> Unit,
     onClose: () -> Unit
 ) {
+    var selected by remember { mutableStateOf<File?>(null) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -1255,25 +1267,31 @@ private fun StickerPanel(
             StickerIcon(Accent, Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text("Stickers", color = Accent, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
-        if (stickers.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text("No stickers yet.", color = HintText, fontSize = 14.sp, textAlign = TextAlign.Center)
+            Spacer(Modifier.weight(1f))
+            val chosen = selected
+            if (chosen != null) {
+                HeaderButton("Delete") { onDelete(chosen); selected = null }
+                HeaderButton("Cancel") { selected = null }
             }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                items(stickers, key = { it.path + it.lastModified() }) { file ->
-                    StickerCell(file) { onSend(file) }
-                }
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4),
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            item(key = "make") { MakeStickerCell(onMake) }
+            items(stickers, key = { it.path + it.lastModified() }) { file ->
+                StickerCell(
+                    file = file,
+                    isSelected = file == selected,
+                    onTap = { if (selected != null) selected = null else onSend(file) },
+                    onHold = { selected = file }
+                )
             }
         }
         Text(
-            text = status ?: "Made on your phone · tap to send",
+            text = status ?: if (selected != null) "Delete this sticker?" else "Made on your phone · hold to delete",
             color = if (status != null) Accent else HintText,
             fontSize = 11.sp,
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -1299,10 +1317,35 @@ private fun StickerPanel(
     }
 }
 
+/** First tile: "+ Make" opens the sticker maker in the Ezhuthola app. */
 @Composable
-private fun StickerCell(file: File, onTap: () -> Unit) {
+private fun MakeStickerCell(onMake: () -> Unit) {
     val view = LocalView.current
     val feedback = LocalKeyFeedback.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(76.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, Accent.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+            .clickable {
+                view.keyTap(feedback)
+                onMake()
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("+", color = Accent, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text("Make", color = Accent, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun StickerCell(file: File, isSelected: Boolean, onTap: () -> Unit, onHold: () -> Unit) {
+    val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
+    val tap by rememberUpdatedState(onTap)
+    val hold by rememberUpdatedState(onHold)
     // A small copy is enough for the grid (512 px → 128 px).
     val image = remember(file.path, file.lastModified()) {
         BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = 4 })
@@ -1313,10 +1356,19 @@ private fun StickerCell(file: File, onTap: () -> Unit) {
             .fillMaxWidth()
             .height(76.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(CardColor)
-            .clickable {
-                view.keyTap(feedback)
-                onTap()
+            .background(if (isSelected) Accent.copy(alpha = 0.18f) else CardColor)
+            .border(1.dp, if (isSelected) Accent else Color.Transparent, RoundedCornerShape(12.dp))
+            .pointerInput(file) {
+                detectTapGestures(
+                    onTap = {
+                        view.keyTap(feedback)
+                        tap()
+                    },
+                    onLongPress = {
+                        if (feedback.vibrate) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        hold()
+                    }
+                )
             }
             .padding(4.dp),
         contentAlignment = Alignment.Center

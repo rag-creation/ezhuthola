@@ -179,6 +179,10 @@ fun SetupScreen(
         )
 
         Spacer(Modifier.height(10.dp))
+        SectionLabel("STICKERS")
+        StickersCard()
+
+        Spacer(Modifier.height(10.dp))
         KeyboardSettingsSections(refreshKey)   // Typing, Missing words, Keyboard look (SettingsSections.kt)
 
         Spacer(Modifier.height(10.dp))
@@ -223,6 +227,34 @@ private fun Header() {
         fontSize = 15.sp,
         lineHeight = 21.sp
     )
+}
+
+/** Make your own stickers from photos or Malayalam text. Opens the sticker maker. */
+@Composable
+private fun StickersCard() {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Card)
+            .border(1.dp, CardBorder, RoundedCornerShape(22.dp))
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Make a sticker", color = TextMain, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "From a photo or Malayalam text. Send it from the sticker button in the keyboard.",
+                color = TextDim, fontSize = 13.sp, lineHeight = 18.sp
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Button(
+            onClick = { context.startActivity(Intent(context, StickerMakerActivity::class.java)) },
+            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.Black)
+        ) { Text("Make", fontWeight = FontWeight.Bold) }
+    }
 }
 
 @Composable

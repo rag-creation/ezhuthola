@@ -241,7 +241,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     stickers = stickers,
                     stickerStatus = stickerStatus,
                     onOpenStickers = ::openStickers,
-                    onSendSticker = ::sendSticker
+                    onSendSticker = ::sendSticker,
+                    onMakeSticker = ::openStickerMaker,
+                    onDeleteSticker = { stickerStore.delete(it); stickers = stickerStore.list() }
                 )
             }
         }
@@ -620,6 +622,15 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         stickerStatus = null
         stickerStore.addSamplesOnce()
         stickers = stickerStore.list()
+    }
+
+    /** "+ Make" in the sticker panel: open the maker (typing a caption there uses Ezhuthola too). */
+    private fun openStickerMaker() {
+        commitWord()
+        requestHideSelf(0)
+        startActivity(
+            Intent(this, StickerMakerActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
     }
 
     /** Tap a sticker: WhatsApp gets a real sticker, other apps an image, if they take one. */
