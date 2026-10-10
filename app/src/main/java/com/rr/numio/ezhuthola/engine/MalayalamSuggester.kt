@@ -87,7 +87,18 @@ class MalayalamSuggester(
         // Forms built from a real base word count as a bit less common than the base.
         val built = splitter.split(typed)
         pool += built.keys
-        fun score(word: String) = maxOf(frequencies.of(word), built[word] ?: 0)
+
+        // A typed final "u" never ends in a chillu: aanu is ആണ്, not ആൺ (male). Subtitle text
+        // often writes ആണ് with the old chillu form, so the list counts it as ആൺ: lend that count
+        // to the ് spelling, and drop the chillu word.
+        val endsInU = typed.endsWith("u", ignoreCase = true)
+        if (endsInU) pool.removeAll { it.isNotEmpty() && it.last() in CHILLU_OF.values }
+        fun score(word: String): Int {
+            val own = maxOf(frequencies.of(word), built[word] ?: 0)
+            if (!endsInU || !word.endsWith(VIRAMA) || word.length < 2) return own
+            val chillu = CHILLU_OF[word[word.length - 2]] ?: return own
+            return maxOf(own, frequencies.of(word.dropLast(2) + chillu))
+        }
 
         // Sorting is stable: equally-common words keep the engine's order.
         var ranked = pool.sortedWith(
@@ -134,6 +145,11 @@ class MalayalamSuggester(
         if (typed.isEmpty()) 0 else frequencies.of(suggest(typed, withEnglish = false).best)
 
     companion object {
+        private const val VIRAMA = "\u0D4D"
+
+        /** ന → ൻ, ണ → ൺ, ര → ർ, ല → ൽ, ള → ൾ */
+        private val CHILLU_OF = mapOf('ന' to 'ൻ', 'ണ' to 'ൺ', 'ര' to 'ർ', 'ല' to 'ൽ', 'ള' to 'ൾ')
+
         /** Letters Manglish can't tell apart are folded together. */
         private val fold: Map<Char, String> = buildMap {
             // vowel length: ാ ീ ൂ േ ോ → short (ാ disappears like the inherent a)

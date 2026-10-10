@@ -26,6 +26,12 @@ class MalayalamSuggesterTest {
         assertEquals("നാളെ", best("nale"))       // needs two changes: a→ാ and ല→ള
     }
 
+    @Test fun typedUNeverEndsInChillu() {
+        assertEquals("ആണ്", best("aanu"))     // "is", not ആൺ (male)
+        assertEquals("ആൺ", best("aan"))
+        assertEquals("കണ്ടു", best("kandu"))   // no chillu twin: unchanged
+    }
+
     @Test fun looseMatchingFindsRealWords() {
         assertEquals("വിശേഷങ്ങൾ", best("visheshangal")) // 3 changes: െ→േ, ശ→ഷ, ൽ→ൾ
         assertEquals("സുഖമാണോ", best("sukamano"))       // k→ഖ, a→ാ, ന→ണ, o→ോ
