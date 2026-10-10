@@ -2,6 +2,8 @@ package com.rr.numio.ezhuthola
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.File
 import android.media.AudioManager
 import android.view.ContextThemeWrapper
 import android.view.View
@@ -147,7 +149,11 @@ fun KeyboardLayout(
     photo: Bitmap?,                   // background for the "Your photo" theme
     photoDim: Float,                  // 0 = photo as-is, 1 = black
     feedback: KeyFeedback,
-    clipboardOn: Boolean = true       // "Clipboard history" setting
+    clipboardOn: Boolean = true,      // "Clipboard history" setting
+    stickers: List<File> = emptyList(),
+    stickerStatus: String? = null,    // "This app doesn't take stickers", shown in the sticker panel
+    onOpenStickers: () -> Unit = {},
+    onSendSticker: (File) -> Unit = {}
 ) {
     CompositionLocalProvider(LocalKeyboardTheme provides theme, LocalKeyFeedback provides feedback) {
         Box(Modifier.fillMaxWidth()) {
@@ -167,7 +173,11 @@ fun KeyboardLayout(
                 session, startWithNumbers, clips, onOpenClipboard, onPasteClip, onTogglePin,
                 onDeleteClip, onClearClips, onOpenSettings, onSwitchKeyboard, searchEmoji,
                 transparent = theme.usesPhoto && photo != null,
-                clipboardOn = clipboardOn
+                clipboardOn = clipboardOn,
+                stickers = stickers,
+                stickerStatus = stickerStatus,
+                onOpenStickers = onOpenStickers,
+                onSendSticker = onSendSticker
             )
         }
     }
@@ -194,7 +204,11 @@ private fun KeyboardContent(
     onSwitchKeyboard: () -> Unit,
     searchEmoji: (String) -> EmojiResults,
     transparent: Boolean,
-    clipboardOn: Boolean = true
+    clipboardOn: Boolean = true,
+    stickers: List<File> = emptyList(),
+    stickerStatus: String? = null,
+    onOpenStickers: () -> Unit = {},
+    onSendSticker: (File) -> Unit = {}
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -203,6 +217,7 @@ private fun KeyboardContent(
     var moreSymbols by remember(session) { mutableStateOf(false) }   // second symbols page
     var emojiOpen by remember(session) { mutableStateOf(false) }
     var clipboardOpen by remember(session) { mutableStateOf(false) }
+    var stickersOpen by remember(session) { mutableStateOf(false) }
 
     fun label(key: String) = if (!symbols && shift != Shift.OFF) key.uppercase() else key
 
@@ -247,12 +262,24 @@ private fun KeyboardContent(
             )
             return@Column
         }
+        if (stickersOpen) {
+            StickerPanel(
+                stickers = stickers,
+                status = stickerStatus,
+                onSend = onSendSticker,
+                onBackspace = onBackspace,
+                onSpace = { onText(" ") },
+                onClose = { stickersOpen = false }
+            )
+            return@Column
+        }
 
         if (suggestions == null || suggestions.typed.isEmpty()) {
             // Not typing a word: show the clipboard button.
             IdleStrip(
                 onOpenSettings = onOpenSettings,
-                onOpenClipboard = { onOpenClipboard(); clipboardOpen = true }
+                onOpenClipboard = { onOpenClipboard(); clipboardOpen = true },
+                onOpenStickers = { onOpenStickers(); stickersOpen = true }
             )
         } else {
             SuggestionStrip(suggestions, onPick)
@@ -950,9 +977,9 @@ private fun Chip(
 // Clipboard
 // ---------------------------------------------------------------------------
 
-/** Strip when no word is being typed: settings gear on the left, clipboard on the right. */
+/** Strip when no word is being typed: settings on the left, stickers and clipboard on the right. */
 @Composable
-private fun IdleStrip(onOpenSettings: () -> Unit, onOpenClipboard: () -> Unit) {
+private fun IdleStrip(onOpenSettings: () -> Unit, onOpenClipboard: () -> Unit, onOpenStickers: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -962,6 +989,7 @@ private fun IdleStrip(onOpenSettings: () -> Unit, onOpenClipboard: () -> Unit) {
     ) {
         StripButton(onOpenSettings) { SettingsIcon(HintText, Modifier.size(24.dp)) }
         Spacer(Modifier.weight(1f))
+        StripButton(onOpenStickers) { StickerIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenClipboard) { ClipboardIcon(HintText, Modifier.size(24.dp)) }
     }
 }
@@ -1193,5 +1221,132 @@ private fun PinIcon(color: Color, modifier: Modifier) {
             close()
         }, color)
         drawLine(color, Offset(12 * u, 13 * u), Offset(12 * u, 21 * u), 2f * u, StrokeCap.Round)
+    }
+}
+// ---------------------------------------------------------------------------
+// Stickers
+// ---------------------------------------------------------------------------
+
+/**
+ * Sticker panel: opens in place of the keys, like the clipboard. Tap a sticker to send it.
+ * WhatsApp gets a real sticker; other apps that take pictures get an image.
+ */
+@Composable
+private fun StickerPanel(
+    stickers: List<File>,
+    status: String?,
+    onSend: (File) -> Unit,
+    onBackspace: () -> Unit,
+    onSpace: () -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .height(RowHeight * 3 + StripHeight) // same height as the letter keyboard + strip
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(StripHeight)
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StickerIcon(Accent, Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Stickers", color = Accent, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+        if (stickers.isEmpty()) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                Text("No stickers yet.", color = HintText, fontSize = 14.sp, textAlign = TextAlign.Center)
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(stickers, key = { it.path + it.lastModified() }) { file ->
+                    StickerCell(file) { onSend(file) }
+                }
+            }
+        }
+        Text(
+            text = status ?: "Made on your phone · tap to send",
+            color = if (status != null) Accent else HintText,
+            fontSize = 11.sp,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            textAlign = TextAlign.Center
+        )
+    }
+    Row(Modifier.fillMaxWidth()) {
+        Key(
+            label = "ABC",
+            modifier = Modifier.weight(1.5f),
+            color = SpecialKeyColor,
+            textColor = Accent,
+            fontSize = 16
+        ) { onClose() }
+        Key("space", Modifier.weight(5f), textColor = HintText, fontSize = 16) { onSpace() }
+        Key(
+            label = "",
+            modifier = Modifier.weight(1.5f),
+            color = SpecialKeyColor,
+            repeat = true,
+            icon = { BackspaceIcon(KeyText) }
+        ) { onBackspace() }
+    }
+}
+
+@Composable
+private fun StickerCell(file: File, onTap: () -> Unit) {
+    val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
+    // A small copy is enough for the grid (512 px → 128 px).
+    val image = remember(file.path, file.lastModified()) {
+        BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = 4 })
+            ?.asImageBitmap()
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(76.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardColor)
+            .clickable {
+                view.keyTap(feedback)
+                onTap()
+            }
+            .padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (image != null) Image(image, contentDescription = "Sticker", contentScale = ContentScale.Fit)
+    }
+}
+
+/** Square sticker with its corner peeling up. */
+@Composable
+private fun StickerIcon(color: Color, modifier: Modifier) {
+    Canvas(modifier) {
+        val u = size.width / 24f
+        val stroke = Stroke(width = 1.9f * u, join = StrokeJoin.Round, cap = StrokeCap.Round)
+        drawPath(Path().apply {
+            moveTo(15 * u, 20 * u)
+            lineTo(7 * u, 20 * u)
+            quadraticTo(4 * u, 20 * u, 4 * u, 17 * u)
+            lineTo(4 * u, 7 * u)
+            quadraticTo(4 * u, 4 * u, 7 * u, 4 * u)
+            lineTo(17 * u, 4 * u)
+            quadraticTo(20 * u, 4 * u, 20 * u, 7 * u)
+            lineTo(20 * u, 15 * u)
+            close()
+        }, color, style = stroke)
+        drawPath(Path().apply {
+            moveTo(20 * u, 15 * u)
+            lineTo(16 * u, 15 * u)
+            quadraticTo(15 * u, 15 * u, 15 * u, 16 * u)
+            lineTo(15 * u, 20 * u)
+        }, color, style = stroke)
     }
 }

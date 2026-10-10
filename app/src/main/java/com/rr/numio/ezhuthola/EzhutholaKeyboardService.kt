@@ -125,6 +125,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var clipboardOn by mutableStateOf(true)
     private var clips by mutableStateOf<List<Clip>>(emptyList())
 
+    // Stickers (files/stickers/*.webp)
+    private val stickerStore by lazy { StickerStore(this) }
+    private var stickers by mutableStateOf<List<File>>(emptyList())
+    private var stickerStatus by mutableStateOf<String?>(null)
+
     /** Password fields: never save what's copied while typing there. */
     private var passwordField = false
 
@@ -232,7 +237,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     photo = photo,
                     photoDim = photoDim,
                     feedback = feedback,
-                    clipboardOn = clipboardOn
+                    clipboardOn = clipboardOn,
+                    stickers = stickers,
+                    stickerStatus = stickerStatus,
+                    onOpenStickers = ::openStickers,
+                    onSendSticker = ::sendSticker
                 )
             }
         }
@@ -603,6 +612,25 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         startActivity(
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
+    }
+
+    // ---- Stickers -------------------------------------------------------------
+
+    private fun openStickers() {
+        stickerStatus = null
+        stickerStore.addSamplesOnce()
+        stickers = stickerStore.list()
+    }
+
+    /** Tap a sticker: WhatsApp gets a real sticker, other apps an image, if they take one. */
+    private fun sendSticker(file: File) {
+        commitWord()
+        val result = StickerSender.send(this, currentInputConnection, currentInputEditorInfo, file)
+        stickerStatus = when (result) {
+            StickerResult.STICKER -> null
+            StickerResult.IMAGE -> "Sent as a picture (this app has no stickers)"
+            StickerResult.NOT_SUPPORTED -> "This app doesn't accept stickers here"
+        }
     }
 
     // ---- Clipboard ------------------------------------------------------------
