@@ -125,7 +125,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var clipboardOn by mutableStateOf(true)
     private var clips by mutableStateOf<List<Clip>>(emptyList())
 
-    // Stickers (files/stickers/*.webp)
+    // Stickers (files/stickers, as .webp files)
     private val stickerStore by lazy { StickerStore(this) }
     private var stickers by mutableStateOf<List<File>>(emptyList())
     private var stickerStatus by mutableStateOf<String?>(null)

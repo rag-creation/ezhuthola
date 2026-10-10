@@ -17,7 +17,7 @@ import androidx.core.view.inputmethod.InputContentInfoCompat
 import java.io.File
 
 /**
- * Stickers live in the app's private storage (files/stickers/*.webp), 512×512 like WhatsApp wants.
+ * Stickers live in the app's private storage (files/stickers, as .webp files), 512×512 like WhatsApp wants.
  * Nothing is downloaded: they're made on the phone, so Ezhuthola still needs no permissions.
  */
 class StickerStore(private val context: Context) {
