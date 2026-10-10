@@ -212,7 +212,7 @@ def cluster(cs, before, after, word, ps, end):
                 if vb is not None and vb.sym == "AH" and not vb.stressed:
                     # seven → സെവൻ, chicken → ചിക്കൻ; but button → ബട്ടൺ, person → പേഴ്സൺ
                     pc = ps[ps.index(vb) - 1].sym if ps.index(vb) > 0 else ""
-                    pieces.append(("ൺ" if pc in ("T", "S", "Z", "P", "B", "F", "SH") else "ൻ", False))
+                    pieces.append(("ൺ" if pc in ("T", "S", "Z", "P", "B", "F") else "ൻ", False))   # station → സ്റ്റേഷൻ
                 else:
                     pieces.append(("ൺ" if back else "ൻ", False))
             else:

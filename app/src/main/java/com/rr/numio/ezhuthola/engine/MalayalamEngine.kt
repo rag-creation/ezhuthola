@@ -163,7 +163,8 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
             // 2. Consonants, with doubling for a repeated single letter: kk → ക്ക
             val cons = rules.consonantKeys.firstOrNull { s.startsWith(it, i) }
             if (cons != null) {
-                val letter = (if (i > 0) rules.consonantsMidWord[cons] else null)
+                val letter = softC(s, i, cons)
+                    ?: (if (i > 0) rules.consonantsMidWord[cons] else null)
                     ?: rules.consonants.getValue(cons)
                 val doubled = cons.length == 1 && i + 1 < s.length && s[i + 1] == cons[0]
                 val base = if (doubled) letter + rules.virama + letter else letter
@@ -194,6 +195,10 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
         }
         return out
     }
+
+    /** "c" before e, i or y sounds like s, as in English: cinema → സിനിമ, city → സിറ്റി. */
+    private fun softC(s: String, i: Int, cons: String): String? =
+        if (cons == "c" && i + 1 < s.length && s[i + 1] in "eiy") rules.consonants["s"] else null
 
     private fun vowelSignAt(s: String, from: Int): Triple<String?, String?, Int> {
         val key = rules.vowelSignKeys.firstOrNull { s.startsWith(it, from) }

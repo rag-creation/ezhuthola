@@ -91,4 +91,16 @@ class MalayalamSuggesterTest {
         assertEquals("ഇവൻ", ivan[0])
         assertEquals("ഐവൻ", ivan[1])
     }
+
+    @Test fun sentenceFromTesting() {
+        // A real test sentence: ente phoninte battery low aanu… cinemakk… mandi… police station
+        assertEquals("ആണ്", en("aanu"))
+        assertEquals("പോവാൻ", en("povaan"))
+        assertEquals("സിനിമയ്ക്ക്", en("cinemakk"))   // soft c, and യ്ക്ക് after a
+        assertEquals("മന്തി", en("mandi"))          // the dish; മണ്ടി is still offered
+        assert("മണ്ടി" in withEnglish.suggest("mandi").words)
+        assertEquals("പോലീസ്", en("police"))
+        assertEquals("സ്റ്റേഷൻ", en("station"))
+        assertEquals("റെയിൽവേ", en("railway"))
+    }
 }

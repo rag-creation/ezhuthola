@@ -63,7 +63,9 @@ class SuffixSplitter(
             } else {
                 // consonant endings stick on as they are: കൂട്ടുകാർ + ക്ക്, കുട്ടി + കളുടെ
                 best(base) { it.last() in CHILLU_BASE || it.endsInVowel() }?.let { (word, n) ->
-                    add(word + malayalam, n)
+                    // After a word ending in "a", ക്ക് takes a യ്: സിനിമയ്ക്ക്, അമ്മയ്ക്ക്
+                    val endsInA = word.last() in '\u0D15'..'\u0D39'
+                    add(if (endsInA && malayalam.startsWith("ക്ക")) word + "യ്" + malayalam else word + malayalam, n)
                 }
             }
         }
