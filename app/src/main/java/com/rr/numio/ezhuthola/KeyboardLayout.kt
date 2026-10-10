@@ -1207,20 +1207,36 @@ private fun HeaderButton(text: String, onClick: () -> Unit) {
     }
 }
 
-/** Clipboard board with a clip at the top and two lines of "text". */
+/**
+ * Clipboard: chamfered board and clip, the Numio N in yellow, three lines of text,
+ * and a yellow folded corner. RR's own design, traced onto a 24×24 grid.
+ */
 @Composable
-private fun ClipboardIcon(color: Color, modifier: Modifier) {
+private fun ClipboardIcon(color: Color, modifier: Modifier, accent: Color = Accent) {
     Canvas(modifier) {
         val u = size.width / 24f
-        val stroke = Stroke(width = 1.9f * u, join = StrokeJoin.Round, cap = StrokeCap.Round)
-        drawRoundRect(
-            color, Offset(6 * u, 4 * u), Size(12 * u, 17 * u), CornerRadius(2 * u, 2 * u), style = stroke
-        )
-        drawRoundRect(
-            color, Offset(9 * u, 2.5f * u), Size(6 * u, 3 * u), CornerRadius(1 * u, 1 * u), style = stroke
-        )
-        drawLine(color, Offset(9 * u, 11 * u), Offset(15 * u, 11 * u), 1.9f * u, StrokeCap.Round)
-        drawLine(color, Offset(9 * u, 15 * u), Offset(13 * u, 15 * u), 1.9f * u, StrokeCap.Round)
+        val line = Stroke(width = 1.42f * u, join = StrokeJoin.Miter, cap = StrokeCap.Butt)
+        drawPath(Path().apply {
+            moveTo(4.74f * u, 8.76f * u); lineTo(4.74f * u, 5.68f * u); lineTo(5.68f * u, 4.85f * u); lineTo(7.68f * u, 4.85f * u)
+        }, color, style = line)
+        drawPath(Path().apply {
+            moveTo(9.79f * u, 2.79f * u); lineTo(14.65f * u, 2.79f * u); lineTo(15.29f * u, 3.41f * u); lineTo(15.29f * u, 4.94f * u); lineTo(14.65f * u, 5.53f * u); lineTo(9.79f * u, 5.53f * u); lineTo(9.12f * u, 4.94f * u); lineTo(9.12f * u, 3.41f * u); close()
+        }, color, style = line)
+        drawPath(Path().apply {
+            moveTo(16.47f * u, 4.85f * u); lineTo(18.47f * u, 4.85f * u); lineTo(19.41f * u, 5.79f * u); lineTo(19.41f * u, 17.44f * u); lineTo(16.03f * u, 21.18f * u); lineTo(5.82f * u, 21.18f * u); lineTo(4.74f * u, 20.18f * u); lineTo(4.74f * u, 16.56f * u)
+        }, color, style = line)
+        drawLine(color, Offset(12.21f * u, 9.12f * u), Offset(16.85f * u, 9.12f * u), 1.06f * u, StrokeCap.Square)
+        drawLine(color, Offset(12.21f * u, 11.47f * u), Offset(16.85f * u, 11.47f * u), 1.06f * u, StrokeCap.Square)
+        drawLine(color, Offset(12.21f * u, 13.82f * u), Offset(15.91f * u, 13.82f * u), 1.06f * u, StrokeCap.Square)
+        drawPath(Path().apply {
+            moveTo(3.76f * u, 8.91f * u); lineTo(6.94f * u, 11.26f * u); lineTo(5.38f * u, 12.65f * u); lineTo(5.38f * u, 15.91f * u); lineTo(3.76f * u, 15.91f * u); close()
+        }, accent)
+        drawPath(Path().apply {
+            moveTo(8.03f * u, 9.35f * u); lineTo(10.00f * u, 9.35f * u); lineTo(10.00f * u, 16.06f * u); lineTo(6.56f * u, 13.47f * u); lineTo(8.03f * u, 12.35f * u); close()
+        }, accent)
+        drawPath(Path().apply {
+            moveTo(14.26f * u, 16.94f * u); lineTo(18.03f * u, 16.41f * u); lineTo(14.26f * u, 20.15f * u); close()
+        }, accent)
     }
 }
 
