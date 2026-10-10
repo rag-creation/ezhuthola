@@ -123,6 +123,19 @@ media → മീഡിയ). `en_ml_words.tsv` is built by [tools/make_en_malayal
 - Ezhuthola's own sound-to-Malayalam rules and hand-written spellings ([tools/en_ml_overrides.tsv](tools/en_ml_overrides.tsv)), GPL-3.0.
 
 To rebuild: `python3 tools/make_en_malayalam.py path/to/cmudict.dict`
+## Sticker fonts
+
+Captions on stickers use these Malayalam fonts, bundled in `app/src/main/assets/fonts/`.
+All are licensed under the **SIL Open Font License 1.1**; the full licence for each is in [licenses/](licenses/).
+
+| Font | By | Licence file |
+|---|---|---|
+| [Baloo Chettan 2](https://github.com/EkType/Baloo2) | The Baloo 2 Project Authors (Ek Type) | [OFL-baloochettan2.txt](licenses/OFL-baloochettan2.txt) |
+| [Manjari](https://github.com/smc/manjari) | The Manjari Project Authors (Swathanthra Malayalam Computing) | [OFL-manjari.txt](licenses/OFL-manjari.txt) |
+| [Gayathri](https://gitlab.com/smc/fonts/gayathri) | The Gayathri Project Authors (Swathanthra Malayalam Computing) | [OFL-gayathri.txt](licenses/OFL-gayathri.txt) |
+| [Chilanka](https://gitlab.com/smc/fonts/chilanka) | The Chilanka Project Authors (Swathanthra Malayalam Computing) | [OFL-chilanka.txt](licenses/OFL-chilanka.txt) |
+
+The font files are unmodified copies from the [Google Fonts repository](https://github.com/google/fonts).
 
 ## Libraries
 

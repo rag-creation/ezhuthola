@@ -106,6 +106,7 @@ Full details are in [CREDITS.md](CREDITS.md); full licence texts are in the [lic
 | [ESDB / SCOWL](https://github.com/en-wl/wordlist) (size 60, American and British) | Kevin Atkinson | [ESDB licence](licenses/ESDB-SCOWL.txt) (MIT-like) | Spelling list: rare real English words are left alone, not "corrected": `en_known_words.txt` |
 | [Unicode CLDR](https://github.com/unicode-org/cldr-json) annotations (CLDR 48, English and Malayalam) | Unicode, Inc. | [Unicode License v3](licenses/Unicode-License-v3.txt) | Emoji names and search keywords |
 | [Unicode Emoji](https://github.com/unicode-org/unicodetools) `emoji-test.txt` (Emoji 17.0) | Unicode, Inc. | [Unicode License v3](licenses/Unicode-License-v3.txt) | Emoji list and order: `emoji_keywords.tsv` |
+| Malayalam fonts: [Baloo Chettan 2](https://github.com/EkType/Baloo2), [Manjari](https://github.com/smc/manjari), [Gayathri](https://gitlab.com/smc/fonts/gayathri), [Chilanka](https://gitlab.com/smc/fonts/chilanka) | Ek Type; Swathanthra Malayalam Computing | [SIL OFL 1.1](licenses/) | Sticker captions |
 | [AndroidX](https://developer.android.com/jetpack/androidx) (Jetpack Compose, Material 3, Core, Lifecycle, Activity, Emoji2 Emoji Picker) | Google / The Android Open Source Project | [Apache 2.0](licenses/Apache-2.0.txt) | App and keyboard UI |
 
 Ezhuthola's own work, under **GPL-3.0**:
