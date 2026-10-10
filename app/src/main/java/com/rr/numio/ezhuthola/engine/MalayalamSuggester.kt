@@ -171,7 +171,10 @@ class MalayalamSuggester(
         private const val LOOSE_PENALTY = 5
 
         /** Manglish chat spellings that mean a different word than the letters say. */
-        private val CHAT_SHORTCUTS = mapOf("aan" to "ആണ്")
+        private val CHAT_SHORTCUTS = mapOf(
+            "aan" to "ആണ്",
+            "mandi" to "മന്തി",   // the dish; മണ്ടി (fool) stays in the strip
+        )
 
         /**
          * Days of the week: people spell the -ആഴ്ച ending many ways (aazhcha, azcha, aycha,
