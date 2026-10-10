@@ -1,4 +1,4 @@
 - English words in Malayalam mode are written the Malayali way: four → ഫോർ, media → മീഡിയ, station → സ്റ്റേഷൻ
 - Stickers: make your own from a photo (trace, magic wand, eraser, shapes) or Malayalam text, with a white border. Add your own pictures or .wastickers packs. Sent as real WhatsApp stickers
 - Better Malayalam: aanu → ആണ്, achanu → അച്ഛന്, kutti → കുട്ടി, cinemakk → സിനിമയ്ക്ക്, all spellings of the days of the week
-- Clipboard history keeps recent clips even when Android closes the keyboard
+- Clipboard history keeps your last 20 clips, with no time limit, even when Android closes the keyboard
