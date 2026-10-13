@@ -1,0 +1,3 @@
+- 🎤 Voice typing key in the strip. It opens the voice typing you already have, like Google voice typing or Samsung voice input, and comes back when you're done
+- Ezhuthola itself still has no microphone or internet permission
+- No voice typing app on the phone? The strip tells you, and helps you turn one on if it's switched off
