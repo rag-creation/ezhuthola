@@ -53,6 +53,7 @@ Ezhuthola is different:
 ### 🧰 Everything else
 - ✅ One tap to switch: the yellow **ola** key changes between Malayalam and English
 - ✅ Emoji panel (hold the comma key) with **emoji search in English, Manglish and Malayalam** — try `love`, `chiri` or `ചിരി`
+- ✅ 🎤 Voice typing key: hands over to the voice typing app you already have (Ezhuthola itself never uses the microphone)
 - ✅ Clipboard history: tap to paste, hold to pin or delete. Passwords and OTPs are never saved
 - ✅ **Stickers**: make your own from a photo (trace, magic wand, eraser, shapes) or Malayalam text, add your own pictures or `.wastickers` packs, and send them as real WhatsApp stickers. All offline
 - ✅ Two symbol pages, with ₹ on both

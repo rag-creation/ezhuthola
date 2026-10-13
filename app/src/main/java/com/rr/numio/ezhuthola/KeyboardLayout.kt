@@ -157,7 +157,10 @@ fun KeyboardLayout(
     onMakeSticker: () -> Unit = {},
     onDeleteSticker: (File) -> Unit = {},
     justCopied: String? = null,        // copied a moment ago: shown as a chip, one tap pastes
-    onPasteJustCopied: () -> Unit = {}
+    onPasteJustCopied: () -> Unit = {},
+    onVoice: () -> Unit = {},          // mic in the strip: hand over to a voice typing app
+    voiceNote: String? = null,         // "No voice typing app on this phone yet"
+    onVoiceNote: () -> Unit = {}
 ) {
     CompositionLocalProvider(LocalKeyboardTheme provides theme, LocalKeyFeedback provides feedback) {
         Box(Modifier.fillMaxWidth()) {
@@ -185,7 +188,10 @@ fun KeyboardLayout(
                 onMakeSticker = onMakeSticker,
                 onDeleteSticker = onDeleteSticker,
                 justCopied = justCopied,
-                onPasteJustCopied = onPasteJustCopied
+                onPasteJustCopied = onPasteJustCopied,
+                onVoice = onVoice,
+                voiceNote = voiceNote,
+                onVoiceNote = onVoiceNote
             )
         }
     }
@@ -220,7 +226,10 @@ private fun KeyboardContent(
     onMakeSticker: () -> Unit = {},
     onDeleteSticker: (File) -> Unit = {},
     justCopied: String? = null,        // copied a moment ago: shown as a chip, one tap pastes
-    onPasteJustCopied: () -> Unit = {}
+    onPasteJustCopied: () -> Unit = {},
+    onVoice: () -> Unit = {},          // mic in the strip: hand over to a voice typing app
+    voiceNote: String? = null,         // "No voice typing app on this phone yet"
+    onVoiceNote: () -> Unit = {}
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -296,7 +305,10 @@ private fun KeyboardContent(
                 onOpenStickers = { onOpenStickers(); stickersOpen = true },
                 onOpenEmoji = { emojiOpen = true },
                 justCopied = if (clipboardOn) justCopied else null,
-                onPasteJustCopied = onPasteJustCopied
+                onPasteJustCopied = onPasteJustCopied,
+                onVoice = onVoice,
+                voiceNote = voiceNote,
+                onVoiceNote = onVoiceNote
             )
         } else {
             SuggestionStrip(suggestions, onPick)
@@ -990,7 +1002,7 @@ private fun Chip(
 // Clipboard
 // ---------------------------------------------------------------------------
 
-/** Strip when no word is being typed: settings and emoji on the left, stickers and clipboard on the right. */
+/** Strip when no word is being typed: settings and emoji on the left, mic, stickers and clipboard on the right. */
 @Composable
 private fun IdleStrip(
     onOpenSettings: () -> Unit,
@@ -999,6 +1011,9 @@ private fun IdleStrip(
     onOpenEmoji: () -> Unit,
     justCopied: String? = null,
     onPasteJustCopied: () -> Unit = {},
+    onVoice: () -> Unit = {},
+    voiceNote: String? = null,
+    onVoiceNote: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -1010,8 +1025,12 @@ private fun IdleStrip(
         StripButton(onOpenSettings) { SettingsIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenEmoji) { SmileIcon(HintText, Modifier.size(24.dp), accent = Accent) }
         Box(Modifier.weight(1f).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
-            if (justCopied != null) JustCopiedChip(justCopied, onPasteJustCopied)
+            when {
+                voiceNote != null -> VoiceNoteChip(voiceNote, onVoiceNote)
+                justCopied != null -> JustCopiedChip(justCopied, onPasteJustCopied)
+            }
         }
+        StripButton(onVoice) { MicIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenStickers) { StickerIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenClipboard) { ClipboardIcon(HintText, Modifier.size(24.dp)) }
     }
@@ -1045,6 +1064,58 @@ private fun JustCopiedChip(text: String, onPaste: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+/** A short note from the mic, in the middle of the strip. */
+@Composable
+private fun VoiceNoteChip(text: String, onTap: () -> Unit) {
+    val view = LocalView.current
+    val feedback = LocalKeyFeedback.current
+    Box(
+        modifier = Modifier
+            .widthIn(max = 240.dp)
+            .clip(RoundedCornerShape(19.dp))
+            .background(CardColor)
+            .clickable {
+                view.keyTap(feedback)
+                onTap()
+            }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = KeyText,
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/** Mic: angular like the clipboard, with a yellow level inside. */
+@Composable
+private fun MicIcon(color: Color, modifier: Modifier, accent: Color = Accent) {
+    Canvas(modifier) {
+        val u = size.width / 24f
+        val line = Stroke(width = 1.42f * u, join = StrokeJoin.Miter, cap = StrokeCap.Butt)
+        drawPath(Path().apply {
+            moveTo(10.60f * u, 2.60f * u); lineTo(13.40f * u, 2.60f * u); lineTo(15.40f * u, 4.60f * u); lineTo(15.40f * u, 12.20f * u)
+            lineTo(13.40f * u, 14.20f * u); lineTo(10.60f * u, 14.20f * u); lineTo(8.60f * u, 12.20f * u); lineTo(8.60f * u, 4.60f * u); close()
+        }, color, style = line)
+        drawPath(Path().apply {
+            moveTo(5.40f * u, 10.20f * u); lineTo(5.40f * u, 13.20f * u); lineTo(9.20f * u, 17.60f * u)
+            lineTo(14.80f * u, 17.60f * u); lineTo(18.60f * u, 13.20f * u); lineTo(18.60f * u, 10.20f * u)
+        }, color, style = line)
+        drawLine(color, Offset(12.00f * u, 17.60f * u), Offset(12.00f * u, 21.20f * u), 1.42f * u)
+        drawLine(color, Offset(8.60f * u, 21.20f * u), Offset(15.40f * u, 21.20f * u), 1.42f * u)
+        drawPath(Path().apply {
+            moveTo(10.30f * u, 9.70f * u); lineTo(13.70f * u, 8.50f * u); lineTo(13.70f * u, 11.60f * u)
+            lineTo(12.70f * u, 12.60f * u); lineTo(11.30f * u, 12.60f * u); lineTo(10.30f * u, 11.60f * u); close()
+        }, accent)
     }
 }
 

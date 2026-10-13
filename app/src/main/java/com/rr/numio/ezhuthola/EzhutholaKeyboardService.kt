@@ -16,6 +16,9 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethod
+import android.view.inputmethod.InputMethodInfo
+import android.view.inputmethod.InputMethodSubtype
+import android.provider.Settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -134,6 +137,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         mainHandler.postDelayed(hideJustCopied, JUST_COPIED_MS)
     }
     private var clipboardOn by mutableStateOf(true)
+
+    /** A short note in the strip after the mic is tapped ("no voice typing app"), and what tapping it does. */
+    private var voiceNote by mutableStateOf<VoiceNote?>(null)
+    private val hideVoiceNote = Runnable { voiceNote = null }
     private var clips by mutableStateOf<List<Clip>>(emptyList())
 
     // Stickers (files/stickers, as .webp files)
@@ -267,6 +274,13 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     onPasteJustCopied = {
                         justCopied?.let(::pasteClip)
                         justCopied = null
+                    },
+                    onVoice = ::startVoiceTyping,
+                    voiceNote = voiceNote?.text,
+                    onVoiceNote = {
+                        val opensSettings = voiceNote?.opensSettings == true
+                        voiceNote = null
+                        if (opensSettings) openKeyboardSettings()
                     }
                 )
             }
@@ -640,6 +654,69 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         )
     }
 
+    // ---- Voice typing ---------------------------------------------------------
+
+    /**
+     * Mic in the strip. Ezhuthola doesn't listen itself (no microphone permission, nothing goes
+     * online): it hands over to a voice typing app you already have, the same way other
+     * keyboards do. When you're done there, that app switches back to Ezhuthola.
+     */
+    private fun startVoiceTyping() {
+        commitWord()
+        val imm = getSystemService(InputMethodManager::class.java)
+        val voice = findVoiceInput(imm)
+        if (voice != null) {
+            val (info, subtype) = voice
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) switchInputMethod(info.id, subtype)
+                else switchInputMethod(info.id)
+                return
+            } catch (e: Exception) {
+                // fall through to the note below
+            }
+        }
+        // Installed but switched off in Android's keyboard list?
+        val off = runCatching {
+            imm.inputMethodList.firstOrNull { it.packageName != packageName && it.hasVoiceSubtype() }
+        }.getOrNull()
+        showVoiceNote(
+            if (off != null) VoiceNote("Turn on ${off.loadLabel(packageManager)} to talk. Tap here", opensSettings = true)
+            else VoiceNote("No voice typing app on this phone yet")
+        )
+    }
+
+    /** An enabled keyboard (not this one) that offers a voice mode, like Google voice typing. */
+    private fun findVoiceInput(imm: InputMethodManager): Pair<InputMethodInfo, InputMethodSubtype?>? =
+        runCatching {
+            imm.enabledInputMethodList
+                .filter { it.packageName != packageName }
+                .firstNotNullOfOrNull { info ->
+                    val subtype = imm.getEnabledInputMethodSubtypeList(info, true).firstOrNull { it.mode == VOICE_MODE }
+                    when {
+                        subtype != null -> info to subtype
+                        info.hasVoiceSubtype() -> info to null
+                        else -> null
+                    }
+                }
+        }.getOrNull()
+
+    private fun InputMethodInfo.hasVoiceSubtype() =
+        (0 until subtypeCount).any { getSubtypeAt(it).mode == VOICE_MODE }
+
+    private fun showVoiceNote(note: VoiceNote) {
+        voiceNote = note
+        mainHandler.removeCallbacks(hideVoiceNote)
+        mainHandler.postDelayed(hideVoiceNote, VOICE_NOTE_MS)
+    }
+
+    /** Android's list of keyboards, where a voice typing app can be switched on. */
+    private fun openKeyboardSettings() {
+        requestHideSelf(0)
+        runCatching {
+            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
     // ---- Stickers -------------------------------------------------------------
 
     private fun openStickers() {
@@ -893,5 +970,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         const val RECENT_CLIPS_FILE = "recent_clips.txt"
         /** How long the "just copied" chip stays in the strip. */
         const val JUST_COPIED_MS = 120_000L
+        /** How long a mic note stays in the strip. */
+        const val VOICE_NOTE_MS = 5_000L
+        /** Subtype mode Android uses for voice typing keyboards. */
+        const val VOICE_MODE = "voice"
     }
 }
+
+private data class VoiceNote(val text: String, val opensSettings: Boolean = false)
