@@ -7,6 +7,9 @@ on:
     branches-ignore: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -34,3 +37,18 @@ jobs:
           name: Ezhuthola-test-${{ github.ref_name }}
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14
+
+      # Also put the APK on a draft release named "Test build", easy to open on the phone.
+      # A draft has no git tag, so F-Droid's update check never sees it.
+      - name: Publish test build (draft)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for id in $(gh api repos/$GITHUB_REPOSITORY/releases --jq '.[] | select(.draft and .name == "Test build") | .id'); do
+            gh api -X DELETE repos/$GITHUB_REPOSITORY/releases/$id
+          done
+          APK="Ezhuthola-test-${GITHUB_REF_NAME//\//-}.apk"
+          cp app/build/outputs/apk/debug/*.apk "$APK"
+          gh release create "test-$GITHUB_REF_NAME-${GITHUB_SHA::7}" "$APK" --draft \
+            --target "$GITHUB_SHA" --title "Test build" \
+            --notes "Branch $GITHUB_REF_NAME (${GITHUB_SHA::7}). For testing only. Installs as Ezhuthola Test."
