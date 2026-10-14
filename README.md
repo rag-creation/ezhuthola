@@ -17,6 +17,7 @@
   <img src="https://img.shields.io/badge/Min%20SDK-26-orange" alt="Min SDK 26" />
   <img src="https://img.shields.io/badge/Permissions-none-brightgreen" alt="Permissions: none" />
   <img src="https://img.shields.io/badge/Ads-none-brightgreen" alt="Ads: none" />
+  <a href="https://f-droid.org/packages/com.rr.numio.ezhuthola/"><img src="https://img.shields.io/f-droid/v/com.rr.numio.ezhuthola" alt="F-Droid version" /></a>
 </p>
 
 Ezhuthola (എഴുത്തോല, the palm-leaf manuscript) is a free, open-source Malayalam keyboard for Android.
@@ -74,8 +75,10 @@ Ezhuthola is different:
 
 ## 📲 Install
 
+<a href="https://f-droid.org/packages/com.rr.numio.ezhuthola/"><img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="80" /></a>
+
+- **F-Droid (recommended, updates automatically):** [f-droid.org/packages/com.rr.numio.ezhuthola](https://f-droid.org/packages/com.rr.numio.ezhuthola/)
 - **GitHub:** download the APK from [Releases](https://github.com/rag-creation/ezhuthola/releases)
-- **F-Droid:** [f-droid.org/packages/com.rr.numio.ezhuthola](https://f-droid.org/packages/com.rr.numio.ezhuthola/)
 
 Then:
 
