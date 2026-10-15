@@ -1942,17 +1942,26 @@ private fun StickerIcon(color: Color, modifier: Modifier, accent: Color = Accent
 // Font styles and the quick emoji row
 // ---------------------------------------------------------------------------
 
-/** Strip button for font styles: a script A with a yellow underline. */
+/**
+ * Strip button for font styles: an angular "A" drawn with the same line as the other strip icons,
+ * with a yellow crossbar.
+ */
 @Composable
-private fun StylesIcon() {
-    Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
-        Text("𝓐", color = HintText, fontSize = 20.sp, lineHeight = 22.sp)
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .size(width = 14.dp, height = 2.dp)
-                .background(Accent)
-        )
+private fun StylesIcon(color: Color = HintText, accent: Color = Accent) {
+    Canvas(Modifier.size(24.dp)) {
+        val u = size.width / 24f
+        val line = Stroke(width = 1.42f * u, join = StrokeJoin.Miter, cap = StrokeCap.Butt)
+        // The A: two legs meeting in a flat top, like the rest of Ezhuthola's angular icons.
+        drawPath(Path().apply {
+            moveTo(3.6f * u, 20.6f * u); lineTo(10.4f * u, 3.4f * u); lineTo(13.6f * u, 3.4f * u); lineTo(20.4f * u, 20.6f * u)
+        }, color, style = line)
+        // Feet
+        drawLine(color, Offset(1.8f * u, 20.6f * u), Offset(6.4f * u, 20.6f * u), 1.42f * u)
+        drawLine(color, Offset(17.6f * u, 20.6f * u), Offset(22.2f * u, 20.6f * u), 1.42f * u)
+        // Yellow crossbar
+        drawPath(Path().apply {
+            moveTo(7.2f * u, 13.4f * u); lineTo(16.8f * u, 13.4f * u); lineTo(16.0f * u, 15.6f * u); lineTo(8.0f * u, 15.6f * u); close()
+        }, accent)
     }
 }
 

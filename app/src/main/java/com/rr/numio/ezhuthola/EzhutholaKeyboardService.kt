@@ -488,9 +488,31 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      */
     private fun toggleLanguage() {
         undo = null
+        mainHandler.removeCallbacks(showWordAtCursor)
+        forgetTapped() // the strip's English suggestions don't belong to the new mode
         malayalam = !malayalam
         prefs.edit().putBoolean(KeyboardSettings.MALAYALAM, malayalam).apply()
-        if (word.isNotEmpty() && !plainField) refreshWord()
+        if (plainField) return
+        if (word.isNotEmpty()) refreshWord()
+        else if (malayalam) convertWordAtCursor()
+    }
+
+    /**
+     * Tapped into a word typed earlier ("enthokkeyund") and switched to Malayalam:
+     * take that word back and write it in Malayalam, as if it had just been typed.
+     * Space or a tap on the strip then keeps it, like any other word.
+     */
+    private fun convertWordAtCursor() {
+        val ic = currentInputConnection ?: return
+        val left = ic.getTextBeforeCursor(MAX_WORD, 0)?.toString().orEmpty().takeLastWhile(::isWordChar)
+        val right = ic.getTextAfterCursor(MAX_WORD, 0)?.toString().orEmpty().takeWhile(::isWordChar)
+        val whole = left + right
+        if (whole.length < 2 || whole.length > MAX_WORD || !whole.any { it.isAsciiLetter() }) return
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(left.length, right.length)
+        word.append(whole)
+        refreshWord()
+        ic.endBatchEdit()
     }
 
     private fun onKeyText(text: String) {
