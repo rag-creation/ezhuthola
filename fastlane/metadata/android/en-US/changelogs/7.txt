@@ -1,0 +1,9 @@
+- Keyboard height setting
+- Slide on space to move the cursor
+- Slide left from backspace to delete words
+- Hold a letter for accents, including Spanish ñ ¿ ¡
+- Font styles (Bold, Script, Tiny and more), can be turned off
+- Decoration symbols page (✿ on the symbols keys)
+- Row of recent emojis, can be turned off
+- Leaf key turns a typed English word into Malayalam
+- Copied text chip hides after pasting
