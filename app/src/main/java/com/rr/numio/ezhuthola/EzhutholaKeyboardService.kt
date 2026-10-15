@@ -135,6 +135,23 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var justCopied by mutableStateOf<String?>(null)
     private val hideJustCopied = Runnable { justCopied = null }
 
+    private fun clearJustCopied() {
+        justCopied = null
+        mainHandler.removeCallbacks(hideJustCopied)
+    }
+
+    /**
+     * Pasted with the app's own Paste (not our chip): the copied text is now right before the
+     * cursor, so the "just copied" chip has done its job and goes away.
+     */
+    private fun hideChipIfPasted() {
+        val copied = justCopied ?: return
+        val probe = copied.take(MAX_PASTE_CHECK)
+        val before = currentInputConnection?.getTextBeforeCursor(copied.length.coerceAtMost(MAX_PASTE_CHECK * 4), 0)
+            ?.toString() ?: return
+        if (before.endsWith(copied) || (copied.length > MAX_PASTE_CHECK && before.contains(probe))) clearJustCopied()
+    }
+
     private fun showJustCopied(text: String) {
         justCopied = text
         mainHandler.removeCallbacks(hideJustCopied)
@@ -171,6 +188,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     /** Quick emoji row: on/off, and the emojis in it (most recently used first). */
     private var emojiRowOn by mutableStateOf(true)
+    private var fontStylesOn by mutableStateOf(true)
     private var recentEmoji by mutableStateOf(DEFAULT_EMOJI)
 
     /** Where the cursor is, as the app last told us (for the space and backspace slides). */
@@ -194,7 +212,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      */
     private val lookListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM ||
-            key == KeyboardSettings.KEY_HEIGHT || key == KeyboardSettings.EMOJI_ROW
+            key == KeyboardSettings.KEY_HEIGHT || key == KeyboardSettings.EMOJI_ROW ||
+            key == KeyboardSettings.FONT_STYLES
         ) {
             mainHandler.post { applySettings() }
         }
@@ -317,7 +336,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     emojiRow = emojiRowOn,
                     recentEmoji = recentEmoji,
                     onEmoji = ::typeEmoji,
-                    onEmojiRow = ::setEmojiRow
+                    onEmojiRow = ::setEmojiRow,
+                    fontStylesOn = fontStylesOn
                 )
             }
         }
@@ -416,6 +436,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         selStart = newSelStart
         selEnd = newSelEnd
+        if (justCopied != null && newSelEnd > oldSelEnd) hideChipIfPasted()
         val cursorLeftTheWord = newSelStart != newSelEnd || candidatesStart < 0 || newSelEnd != candidatesEnd
         if (word.isNotEmpty() && cursorLeftTheWord) {
             val ic = currentInputConnection
@@ -835,6 +856,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             sound = prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)
         )
         emojiRowOn = prefs.getBoolean(KeyboardSettings.EMOJI_ROW, true)
+        fontStylesOn = prefs.getBoolean(KeyboardSettings.FONT_STYLES, true)
+        if (!fontStylesOn) fontStyle = null
         keyHeight = prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)
             .coerceIn(KeyboardSettings.MIN_KEY_HEIGHT, KeyboardSettings.MAX_KEY_HEIGHT)
         clipboardOn = prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)
@@ -1009,6 +1032,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     }
 
     private fun pasteClip(text: String) {
+        if (text == justCopied) clearJustCopied()
         commitWord()
         undo = null
         commit(text)
@@ -1186,6 +1210,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         const val MAX_WORD = 30
         const val MAX_DELETE_TEXT = 1000   // backspace swipe looks this far back for words
         const val MAX_RECENT_EMOJI = 24
+        const val MAX_PASTE_CHECK = 200     // long copies: checking the start is enough
 
         /** The quick emoji row before you've used any emoji. */
         val DEFAULT_EMOJI = listOf("😂", "❤️", "🙏", "🥰", "🤣", "👍", "😭", "😍", "🔥", "😊", "🥲", "😁", "🤗", "😅", "💯", "🙌")

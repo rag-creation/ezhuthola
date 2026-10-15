@@ -145,6 +145,19 @@ private val symbolRows = listOf(
     listOf("*", "\"", "'", ":", ";", "!", "?")
 )
 
+// Third page: decorations for names and bios (the ✿ key). Hold some for more.
+private val decorRows = listOf(
+    listOf("༺", "♡", "༻", "彡", "★", "✯", "✪", "❂", "☘", "⌘"),
+    listOf("ღ", "✿", "❀", "❝", "❞", "⫷", "⫸", "◁", "▷", "⑅"),
+    listOf("◉", "◎", "◐", "◑", "⊙", "⊗", "〇", "∇", "∆")
+)
+private val DecorAlternates: Map<String, List<String>> = mapOf(
+    "༺" to listOf("༒", "༆", "༄"),
+    "◉" to listOf("◍"),
+    "◐" to listOf("◕", "◔", "◓", "◒"),
+    "〇" to listOf("〶")
+)
+
 // Second symbols page (the =\< key)
 private val moreSymbolRows = listOf(
     listOf("~", "`", "|", "•", "√", "π", "÷", "×", "¶", "∆"),
@@ -247,7 +260,8 @@ fun KeyboardLayout(
     emojiRow: Boolean = false,         // "Quick emoji row" setting
     recentEmoji: List<String> = emptyList(),
     onEmoji: (String) -> Unit = onText, // an emoji was picked: type it and remember it
-    onEmojiRow: (Boolean) -> Unit = {}  // turn the quick emoji row on/off from the keyboard
+    onEmojiRow: (Boolean) -> Unit = {}, // turn the quick emoji row on/off from the keyboard
+    fontStylesOn: Boolean = true        // "Font styles" setting: show the styles button
 ) {
     CompositionLocalProvider(
         LocalKeyboardTheme provides theme,
@@ -289,7 +303,8 @@ fun KeyboardLayout(
                 emojiRow = emojiRow,
                 recentEmoji = recentEmoji,
                 onEmoji = onEmoji,
-                onEmojiRow = onEmojiRow
+                onEmojiRow = onEmojiRow,
+                fontStylesOn = fontStylesOn
             )
         }
     }
@@ -334,13 +349,15 @@ private fun KeyboardContent(
     emojiRow: Boolean = false,
     recentEmoji: List<String> = emptyList(),
     onEmoji: (String) -> Unit = onText,
-    onEmojiRow: (Boolean) -> Unit = {}
+    onEmojiRow: (Boolean) -> Unit = {},
+    fontStylesOn: Boolean = true
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
     var shift by remember(session) { mutableStateOf(Shift.OFF) }
     var symbols by remember(session) { mutableStateOf(startWithNumbers) }
     var moreSymbols by remember(session) { mutableStateOf(false) }   // second symbols page
+    var decor by remember(session) { mutableStateOf(false) }         // third page: ✿ decorations
     var emojiOpen by remember(session) { mutableStateOf(false) }
     var clipboardOpen by remember(session) { mutableStateOf(false) }
     var stickersOpen by remember(session) { mutableStateOf(false) }
@@ -355,13 +372,14 @@ private fun KeyboardContent(
 
     val rows = when {
         !symbols -> letterRows
+        decor -> decorRows
         moreSymbols -> moreSymbolRows
         else -> symbolRows
     }
 
     // Hold a letter: accents and symbols (letters page only).
     fun alternates(key: String): List<String>? =
-        if (symbols) null else Alternates[key]?.map { if (shift != Shift.OFF) it.shifted() else it }
+        if (decor) DecorAlternates[key] else if (symbols) null else Alternates[key]?.map { if (shift != Shift.OFF) it.shifted() else it }
     fun typeAlternate(text: String) {
         onText(text)
         if (shift == Shift.ONCE) shift = Shift.OFF
@@ -458,7 +476,7 @@ private fun KeyboardContent(
             // Not typing a word: show the clipboard button.
             IdleStrip(
                 onOpenSettings = onOpenSettings,
-                onOpenStyles = { stylesOpen = true },
+                onOpenStyles = if (fontStylesOn) ({ stylesOpen = true }) else null,
                 onOpenClipboard = { onOpenClipboard(); clipboardOpen = true },
                 onOpenStickers = { onOpenStickers(); stickersOpen = true },
                 onOpenEmoji = { emojiOpen = true },
@@ -515,11 +533,18 @@ private fun KeyboardContent(
             } else {
                 // Symbols: switch between the two symbol pages
                 Key(
-                    label = if (moreSymbols) "?123" else "=\\<",
+                    // ?123 page → =\< page → ✿ decorations → back to ?123
+                    label = when { decor -> "?123"; moreSymbols -> "✿"; else -> "=\\<" },
                     modifier = Modifier.weight(1.5f),
                     color = SpecialKeyColor,
                     fontSize = 16
-                ) { moreSymbols = !moreSymbols }
+                ) {
+                    when {
+                        decor -> { decor = false; moreSymbols = false }
+                        moreSymbols -> { moreSymbols = false; decor = true }
+                        else -> moreSymbols = true
+                    }
+                }
             }
             rows[2].forEach { k ->
                 Key(label(k), Modifier.weight(1f), alternates = alternates(k), onAlternate = ::typeAlternate) { type(k) }
@@ -541,7 +566,7 @@ private fun KeyboardContent(
                 modifier = Modifier.weight(1.5f),
                 color = SpecialKeyColor,
                 fontSize = 16
-            ) { symbols = !symbols; moreSymbols = false }
+            ) { symbols = !symbols; moreSymbols = false; decor = false }
             Key(
                 label = ",",
                 modifier = Modifier.weight(1f),
@@ -1430,7 +1455,7 @@ private fun IdleStrip(
     onOpenClipboard: () -> Unit,
     onOpenStickers: () -> Unit,
     onOpenEmoji: () -> Unit,
-    onOpenStyles: () -> Unit = {},
+    onOpenStyles: (() -> Unit)? = null,
     justCopied: String? = null,
     onPasteJustCopied: () -> Unit = {},
     onVoice: () -> Unit = {},
@@ -1446,7 +1471,7 @@ private fun IdleStrip(
     ) {
         StripButton(onOpenSettings) { SettingsIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenEmoji) { SmileIcon(HintText, Modifier.size(24.dp), accent = Accent) }
-        StripButton(onOpenStyles) { StylesIcon() }
+        onOpenStyles?.let { StripButton(it) { StylesIcon() } }
         Box(Modifier.weight(1f).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
             when {
                 voiceNote != null -> VoiceNoteChip(voiceNote, onVoiceNote)

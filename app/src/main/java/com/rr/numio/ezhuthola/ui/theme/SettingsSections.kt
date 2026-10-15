@@ -77,6 +77,7 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
     var sound by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)) }
     var clipboard by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)) }
     var emojiRow by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.EMOJI_ROW, true)) }
+    var fontStyles by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.FONT_STYLES, true)) }
     var keyHeight by remember {
         mutableFloatStateOf(
             prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)
@@ -134,6 +135,13 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
             emojiRow
         ) {
             emojiRow = it; prefs.edit().putBoolean(KeyboardSettings.EMOJI_ROW, it).apply()
+        }
+        ToggleRow(
+            "Font styles",
+            "Button in the top strip for 𝐁𝐨𝐥𝐝, 𝓢𝓬𝓻𝓲𝓹𝓽, ᵗⁱⁿʸ and other letter styles.",
+            fontStyles
+        ) {
+            fontStyles = it; prefs.edit().putBoolean(KeyboardSettings.FONT_STYLES, it).apply()
         }
         ToggleRow(
             "Clipboard history",
