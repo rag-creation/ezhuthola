@@ -1943,24 +1943,46 @@ private fun StickerIcon(color: Color, modifier: Modifier, accent: Color = Accent
 // ---------------------------------------------------------------------------
 
 /**
- * Strip button for font styles: an angular "A" drawn with the same line as the other strip icons,
- * with a yellow crossbar.
+ * Strip button for font styles: a handwritten N with a yellow sparkle and a yellow swoosh
+ * underneath (RR's design). Thin up-strokes, a thicker down-stroke, like pen lettering.
  */
 @Composable
 private fun StylesIcon(color: Color = HintText, accent: Color = Accent) {
     Canvas(Modifier.size(24.dp)) {
         val u = size.width / 24f
-        val line = Stroke(width = 1.42f * u, join = StrokeJoin.Miter, cap = StrokeCap.Butt)
-        // The A: two legs meeting in a flat top, like the rest of Ezhuthola's angular icons.
+        // The N in one pen line: up, down the diagonal, up again with a little flick.
         drawPath(Path().apply {
-            moveTo(3.6f * u, 20.6f * u); lineTo(10.4f * u, 3.4f * u); lineTo(13.6f * u, 3.4f * u); lineTo(20.4f * u, 20.6f * u)
-        }, color, style = line)
-        // Feet
-        drawLine(color, Offset(1.8f * u, 20.6f * u), Offset(6.4f * u, 20.6f * u), 1.42f * u)
-        drawLine(color, Offset(17.6f * u, 20.6f * u), Offset(22.2f * u, 20.6f * u), 1.42f * u)
-        // Yellow crossbar
+            moveTo(3.4f * u, 18.6f * u)
+            cubicTo(5.6f * u, 15.2f * u, 7.0f * u, 7.6f * u, 9.0f * u, 5.8f * u)
+            cubicTo(10.0f * u, 4.9f * u, 10.6f * u, 6.6f * u, 11.2f * u, 9.2f * u)
+            cubicTo(11.9f * u, 12.4f * u, 12.8f * u, 16.4f * u, 13.9f * u, 17.4f * u)
+            cubicTo(14.9f * u, 18.2f * u, 15.5f * u, 14.6f * u, 16.1f * u, 10.6f * u)
+            cubicTo(16.6f * u, 7.2f * u, 17.4f * u, 4.6f * u, 19.0f * u, 4.4f * u)
+        }, color, style = Stroke(width = 1.15f * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        // Heavier down-stroke on the diagonal
         drawPath(Path().apply {
-            moveTo(7.2f * u, 13.4f * u); lineTo(16.8f * u, 13.4f * u); lineTo(16.0f * u, 15.6f * u); lineTo(8.0f * u, 15.6f * u); close()
+            moveTo(10.7f * u, 7.6f * u)
+            cubicTo(11.4f * u, 10.8f * u, 12.4f * u, 15.2f * u, 13.8f * u, 17.2f * u)
+        }, color, style = Stroke(width = 2.7f * u, cap = StrokeCap.Round))
+        // Four-point sparkle
+        val cx = 20.3f * u
+        val cy = 11.4f * u
+        drawPath(Path().apply {
+            moveTo(cx, cy - 3f * u)
+            quadraticTo(cx + 0.4f * u, cy - 0.4f * u, cx + 2.4f * u, cy)
+            quadraticTo(cx + 0.4f * u, cy + 0.4f * u, cx, cy + 3f * u)
+            quadraticTo(cx - 0.4f * u, cy + 0.4f * u, cx - 2.4f * u, cy)
+            quadraticTo(cx - 0.4f * u, cy - 0.4f * u, cx, cy - 3f * u)
+            close()
+        }, accent)
+        // Swoosh, thicker on the left and fading to a point on the right
+        drawPath(Path().apply {
+            moveTo(3.0f * u, 22.2f * u)
+            quadraticTo(11f * u, 19.6f * u, 19.8f * u, 19.3f * u)
+            quadraticTo(21f * u, 19.4f * u, 20f * u, 20.0f * u)
+            quadraticTo(11.5f * u, 20.4f * u, 3.6f * u, 22.8f * u)
+            quadraticTo(2.8f * u, 22.8f * u, 3.0f * u, 22.2f * u)
+            close()
         }, accent)
     }
 }
