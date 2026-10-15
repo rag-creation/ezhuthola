@@ -1,5 +1,6 @@
 package com.rr.numio.ezhuthola
 
+import kotlin.math.roundToInt
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -75,6 +76,12 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
     var vibrate by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.VIBRATE, true)) }
     var sound by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)) }
     var clipboard by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)) }
+    var keyHeight by remember {
+        mutableFloatStateOf(
+            prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)
+                .coerceIn(KeyboardSettings.MIN_KEY_HEIGHT, KeyboardSettings.MAX_KEY_HEIGHT)
+        )
+    }
     var themeId by remember { mutableStateOf(prefs.getString(KeyboardSettings.THEME, Themes.Numio.id)!!) }
     var dim by remember { mutableFloatStateOf(prefs.getFloat(KeyboardSettings.PHOTO_DIM, 0.45f)) }
     var photoVersion by remember { mutableIntStateOf(0) }
@@ -127,8 +134,43 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
         ) {
             clipboard = it; prefs.edit().putBoolean(KeyboardSettings.CLIPBOARD_HISTORY, it).apply()
         }
+        // Keyboard height: 75%–125%. The keyboard follows the slider straight away
+        // (try it in the box at the top of this screen).
+        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Keyboard height", color = TextMain, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Text("${(keyHeight * 100).roundToInt()}%", color = TextDim, fontSize = 15.sp)
+            if (keyHeight != 1f) {
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "Reset",
+                    color = Accent,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable {
+                            keyHeight = 1f
+                            prefs.edit().putFloat(KeyboardSettings.KEY_HEIGHT, 1f).apply()
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+        Slider(
+            value = keyHeight,
+            onValueChange = { keyHeight = (it * 20).roundToInt() / 20f }, // steps of 5%
+            onValueChangeFinished = { prefs.edit().putFloat(KeyboardSettings.KEY_HEIGHT, keyHeight).apply() },
+            valueRange = KeyboardSettings.MIN_KEY_HEIGHT..KeyboardSettings.MAX_KEY_HEIGHT,
+            colors = SliderDefaults.colors(
+                thumbColor = Accent,
+                activeTrackColor = Accent,
+                inactiveTrackColor = Color(0xFF333333)
+            )
+        )
         Text(
-            "Tip: hold the space bar to switch to another keyboard.",
+            "Tips: hold the space bar to switch to another keyboard. Slide on the space bar to " +
+                    "move the cursor. Slide left from backspace to delete whole words. Hold a letter " +
+                    "for accents and symbols (hold e for é, a for @).",
             color = TextDim,
             fontSize = 13.sp,
             lineHeight = 18.sp,

@@ -118,6 +118,9 @@ data class KeyFeedback(val vibrate: Boolean = true, val sound: Boolean = false)
 
 val LocalKeyFeedback = staticCompositionLocalOf { KeyFeedback() }
 
+/** Keyboard height as a fraction of the normal size (the "Keyboard height" setting). */
+val LocalKeyHeight = staticCompositionLocalOf { 1f }
+
 /**
  * Settings shared by the app screen (where you change them) and the keyboard (which reads them
  * each time it opens). Stored in the app's private preferences.
@@ -130,6 +133,10 @@ object KeyboardSettings {
     const val KEY_SOUND = "key_sound"
     const val CLIPBOARD_HISTORY = "clipboard_history"
     const val MALAYALAM = "malayalam"
+    const val KEY_HEIGHT = "key_height"          // 0.75 … 1.25, 1 = normal
+
+    const val MIN_KEY_HEIGHT = 0.75f
+    const val MAX_KEY_HEIGHT = 1.25f
 
     private const val PHOTO_FILE = "keyboard_photo.jpg"
 

@@ -15,11 +15,13 @@ import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputMethod
 import android.view.inputmethod.InputMethodInfo
 import android.view.inputmethod.InputMethodSubtype
 import android.provider.Settings
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -46,6 +48,7 @@ import com.rr.numio.ezhuthola.engine.MalayalamRules
 import com.rr.numio.ezhuthola.engine.MalayalamSuggester
 import com.rr.numio.ezhuthola.engine.MissingWordFilter
 import com.rr.numio.ezhuthola.engine.Suggestions
+import com.rr.numio.ezhuthola.engine.TextSteps
 import com.rr.numio.ezhuthola.engine.UserWords
 import com.rr.numio.ezhuthola.engine.WordFrequencies
 import java.io.File
@@ -160,6 +163,18 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var photoStamp = 0L      // when the loaded photo file was saved
     private var photoDim by mutableStateOf(0.45f)
     private var feedback by mutableStateOf(KeyFeedback())
+    private var keyHeight by mutableFloatStateOf(1f)
+
+    /** Where the cursor is, as the app last told us (for the space and backspace slides). */
+    private var selStart = -1
+    private var selEnd = -1
+
+    /** Backspace slide: cursor position when it started, and the text before it. */
+    private var deleteAnchor = -1
+    private var deleteBefore = ""
+
+    /** Space slide: where we've moved the cursor to. */
+    private var slideCursor = -1
     private var keyboardRoot: View? = null
 
     /** Password, email and web-address fields always get plain English. */
@@ -170,7 +185,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      * (the "Try it" box). Kept in a field: Android only holds listeners weakly.
      */
     private val lookListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM) {
+        if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM || key == KeyboardSettings.KEY_HEIGHT) {
             mainHandler.post { applySettings() }
         }
     }
@@ -281,7 +296,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                         val opensSettings = voiceNote?.opensSettings == true
                         voiceNote = null
                         if (opensSettings) openKeyboardSettings()
-                    }
+                    },
+                    keyHeight = keyHeight,
+                    slideActions = slideActions
                 )
             }
         }
@@ -333,6 +350,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         plainField = info?.let(::isPlainField) ?: false
         startWithNumbers = info?.let(::isNumberField) ?: false
         passwordField = info?.let(::isPasswordField) ?: false
+        selStart = info?.initialSelStart ?: -1
+        selEnd = info?.initialSelEnd ?: -1
+        deleteAnchor = -1
+        slideCursor = -1
         noLearning = info != null &&
                 (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
         // `restarting` = same field, the app just refreshed it: keep the current page.
@@ -348,6 +369,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         mainHandler.removeCallbacks(showWordAtCursor)
+        if (deleteAnchor >= 0) finishWordDelete(0) // keyboard closed mid-swipe: just drop the selection
         forgetTapped()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         commitWord()
@@ -370,6 +392,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         candidatesStart: Int, candidatesEnd: Int
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        selStart = newSelStart
+        selEnd = newSelEnd
         val cursorLeftTheWord = newSelStart != newSelEnd || candidatesStart < 0 || newSelEnd != candidatesEnd
         if (word.isNotEmpty() && cursorLeftTheWord) {
             val ic = currentInputConnection
@@ -458,6 +482,12 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                 word.append(text)
                 refreshWord()
             }
+            // An accent from holding a letter ("é"): keep the word as typed (no autocorrect on
+            // half a word like "caf"), then add the accent.
+            text.length == 1 && text[0].isLetter() && !text[0].isAsciiLetter() -> {
+                finishTyping()
+                commit(text)
+            }
             // Space: commit the best word, then the space.
             text == " " -> {
                 commitWord()
@@ -487,6 +517,118 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         // A real key event handles selected text and emoji correctly.
         if (undoCorrection()) return
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+    }
+
+    // ---- Slides: space moves the cursor, backspace swipe deletes words ----------
+
+    private val slideActions = SlideActions(
+        startCursor = ::startCursorSlide,
+        moveCursor = ::moveCursor,
+        startWordDelete = ::startWordDelete,
+        selectWords = ::selectWords,
+        finishWordDelete = ::finishWordDelete
+    )
+
+    /** Keep the word being typed exactly as it shows (no autocorrect), and stop composing. */
+    private fun finishTyping() {
+        if (word.isEmpty()) return
+        currentInputConnection?.finishComposingText()
+        resetWord()
+    }
+
+    /**
+     * Where the cursor is now (the start of the selection, if text is selected: that's where
+     * Android's "text before cursor" ends). Asks the app; falls back to the last position it reported.
+     */
+    private fun cursorNow(): Int {
+        val ic = currentInputConnection ?: return selStart
+        val text = ic.getExtractedText(ExtractedTextRequest(), 0)
+        if (text != null && text.selectionStart >= 0) return text.startOffset + text.selectionStart
+        return selStart
+    }
+
+    private fun startCursorSlide() {
+        undo = null
+        forgetTapped()
+        finishTyping()
+        slideCursor = cursorNow()
+    }
+
+    /** Move the cursor [steps] characters (negative = left), a whole emoji or letter at a time. */
+    private fun moveCursor(steps: Int) {
+        val ic = currentInputConnection ?: return
+        if (slideCursor < 0) {
+            // The app doesn't tell us where the cursor is: fall back to arrow keys.
+            val code = if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+            repeat(kotlin.math.abs(steps)) { sendDownUpKeyEvents(code) }
+            return
+        }
+        var pos = slideCursor
+        repeat(kotlin.math.abs(steps)) {
+            val step = if (steps < 0) {
+                ic.getTextBeforeCursor(16, 0)?.let(::lastCharLength) ?: 0
+            } else {
+                ic.getTextAfterCursor(16, 0)?.let(::firstCharLength) ?: 0
+            }
+            if (step == 0) return@repeat
+            pos += if (steps < 0) -step else step
+            ic.setSelection(pos, pos)
+        }
+        slideCursor = pos
+    }
+
+    /** Length of the last letter/emoji in [text] (an emoji or a Malayalam letter can be several chars). */
+    private fun lastCharLength(text: CharSequence): Int {
+        if (text.isEmpty()) return 0
+        val chars = android.icu.text.BreakIterator.getCharacterInstance()
+        chars.setText(text.toString())
+        val end = chars.last()
+        val start = chars.preceding(end)
+        return if (start == android.icu.text.BreakIterator.DONE) end else end - start
+    }
+
+    private fun firstCharLength(text: CharSequence): Int {
+        if (text.isEmpty()) return 0
+        val chars = android.icu.text.BreakIterator.getCharacterInstance()
+        chars.setText(text.toString())
+        val next = chars.following(0)
+        return if (next == android.icu.text.BreakIterator.DONE) text.length else next
+    }
+
+    private fun startWordDelete() {
+        undo = null
+        forgetTapped()
+        finishTyping()
+        val ic = currentInputConnection ?: return
+        deleteAnchor = cursorNow()
+        deleteBefore = ic.getTextBeforeCursor(MAX_DELETE_TEXT, 0)?.toString().orEmpty()
+    }
+
+    /** Swiping left: select the last [words] words, so you can see what will go. */
+    private fun selectWords(words: Int) {
+        val ic = currentInputConnection ?: return
+        if (deleteAnchor < 0) return
+        val count = words.coerceAtMost(TextSteps.wordsBefore(deleteBefore))
+        val length = TextSteps.lengthOfWordsBefore(deleteBefore, count)
+        ic.setSelection(deleteAnchor - length, deleteAnchor)
+    }
+
+    /** Finger lifted: delete the selected words (none = put the cursor back where it was). */
+    private fun finishWordDelete(words: Int) {
+        val ic = currentInputConnection
+        val anchor = deleteAnchor
+        deleteAnchor = -1
+        if (ic == null || anchor < 0) return
+        val length = TextSteps.lengthOfWordsBefore(deleteBefore, words)
+        deleteBefore = ""
+        if (length == 0) {
+            ic.setSelection(anchor, anchor)
+            return
+        }
+        ic.beginBatchEdit()
+        ic.setSelection(anchor - length, anchor)
+        ic.commitText("", 1)
+        ic.endBatchEdit()
     }
 
     private fun enter() {
@@ -618,6 +760,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             vibrate = prefs.getBoolean(KeyboardSettings.VIBRATE, true),
             sound = prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)
         )
+        keyHeight = prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)
+            .coerceIn(KeyboardSettings.MIN_KEY_HEIGHT, KeyboardSettings.MAX_KEY_HEIGHT)
         clipboardOn = prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)
         if (!clipboardOn) {
             if (history.all(now()).any { !it.pinned }) { history.clearUnpinned(); saveClips() }
@@ -965,6 +1109,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private companion object {
         /** Longest word picked back up or suggested for after the cursor moves. */
         const val MAX_WORD = 30
+        const val MAX_DELETE_TEXT = 1000   // backspace swipe looks this far back for words
         const val ML_USER_FILE = "user_words_ml.tsv"
         const val CLIPS_FILE = "pinned_clips.txt"
         const val RECENT_CLIPS_FILE = "recent_clips.txt"

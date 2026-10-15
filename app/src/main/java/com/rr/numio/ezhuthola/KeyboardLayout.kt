@@ -74,15 +74,37 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.emoji2.emojipicker.EmojiPickerView
 import kotlin.math.min
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.roundToInt
+import kotlin.math.sign
+import android.os.SystemClock
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 
 // ---- Sizes: change these to resize the whole keyboard ----
-private val RowHeight = 88.dp          // touch height of one row (includes the gap)
+private val BaseRowHeight = 88.dp      // touch height of one row (includes the gap) at 100%
+/** Row height after the "Keyboard height" setting (75%–125%). */
+private val RowHeight: Dp @Composable get() = BaseRowHeight * LocalKeyHeight.current
 private val KeyGapH = 2.dp             // half of the gap between keys
 private val KeyGapV = 5.dp             // half of the gap between rows
 private const val KeyFontSize = 28
 private const val LongPressMs = 350L   // hold a top-row key this long to type its number
 private const val RepeatStartMs = 400L // hold backspace this long before it repeats
 private const val RepeatEveryMs = 50L
+private val SlideSlop = 14.dp          // a finger moving less than this is still a tap
+private val CursorStep = 12.dp         // slide on space: one character per step
+private val WordStep = 26.dp           // slide left from backspace: one word per step
+private val AltPopupHeight = 54.dp     // the accents row that opens above a held key
 
 // ---- Colours: they come from the chosen theme (see KeyboardTheme.kt) ----
 private val KeyboardBg: Color @Composable get() = LocalKeyboardTheme.current.background
@@ -125,6 +147,58 @@ private val moreSymbolRows = listOf(
     listOf("₹", "%", "©", "®", "™", "[", "]", "<", ">")
 )
 
+/**
+ * Hold a letter for these. The first one is what you get if you just hold and let go:
+ * the number on the top row, and on the other rows the symbol in the same spot on ?123.
+ */
+private val Alternates: Map<String, List<String>> = mapOf(
+    "q" to listOf("1"),
+    "w" to listOf("2"),
+    "e" to listOf("3", "é", "è", "ê", "ë", "ē"),
+    "r" to listOf("4"),
+    "t" to listOf("5"),
+    "y" to listOf("6", "ý", "ÿ"),
+    "u" to listOf("7", "ú", "ù", "û", "ü", "ū"),
+    "i" to listOf("8", "í", "ì", "î", "ï", "ī"),
+    "o" to listOf("9", "ó", "ò", "ô", "ö", "õ", "ø", "œ", "ō"),
+    "p" to listOf("0"),
+    "a" to listOf("@", "á", "à", "â", "ä", "ã", "å", "æ", "ā"),
+    "s" to listOf("#", "ß", "ś", "š"),
+    "d" to listOf("₹", "ð"),
+    "f" to listOf("_"),
+    "g" to listOf("&"),
+    "h" to listOf("-"),
+    "j" to listOf("+"),
+    "k" to listOf("(", "["),
+    "l" to listOf(")", "]", "/"),
+    "z" to listOf("*", "ž", "ź", "ż"),
+    "x" to listOf("\""),
+    "c" to listOf("'", "ç", "ć", "č"),
+    "v" to listOf(":"),
+    "b" to listOf(";"),
+    "n" to listOf("!", "ñ", "ń"),
+    "m" to listOf("?")
+)
+
+/** Hold the period key for more punctuation. */
+private val PeriodAlternates = listOf("?", "!", ",", "'", "\"", ":", ";", "-", "…")
+
+/** Capital version of an accent when shift is on ("é" → "É"); symbols and ß stay as they are. */
+private fun String.shifted(): String =
+    if (length == 1 && this[0].isLetter()) uppercase().takeIf { it.length == 1 } ?: this else this
+
+/**
+ * What the space bar and backspace do when you slide a finger along them
+ * (the keyboard service does the actual text work).
+ */
+class SlideActions(
+    val startCursor: () -> Unit = {},
+    val moveCursor: (Int) -> Unit = {},        // characters, negative = left
+    val startWordDelete: () -> Unit = {},
+    val selectWords: (Int) -> Unit = {},       // how many words are picked so far (0 = none)
+    val finishWordDelete: (Int) -> Unit = {}   // finger lifted: delete that many words
+)
+
 @Composable
 fun KeyboardLayout(
     malayalam: Boolean,               // yellow ola key = Malayalam mode
@@ -160,9 +234,15 @@ fun KeyboardLayout(
     onPasteJustCopied: () -> Unit = {},
     onVoice: () -> Unit = {},          // mic in the strip: hand over to a voice typing app
     voiceNote: String? = null,         // "No voice typing app on this phone yet"
-    onVoiceNote: () -> Unit = {}
+    onVoiceNote: () -> Unit = {},
+    keyHeight: Float = 1f,             // "Keyboard height" setting, 1 = normal
+    slideActions: SlideActions = SlideActions()
 ) {
-    CompositionLocalProvider(LocalKeyboardTheme provides theme, LocalKeyFeedback provides feedback) {
+    CompositionLocalProvider(
+        LocalKeyboardTheme provides theme,
+        LocalKeyFeedback provides feedback,
+        LocalKeyHeight provides keyHeight
+    ) {
         Box(Modifier.fillMaxWidth()) {
             if (theme.usesPhoto && photo != null) {
                 // The photo fills the keyboard, darkened so the letters stay readable.
@@ -191,7 +271,8 @@ fun KeyboardLayout(
                 onPasteJustCopied = onPasteJustCopied,
                 onVoice = onVoice,
                 voiceNote = voiceNote,
-                onVoiceNote = onVoiceNote
+                onVoiceNote = onVoiceNote,
+                slideActions = slideActions
             )
         }
     }
@@ -229,7 +310,8 @@ private fun KeyboardContent(
     onPasteJustCopied: () -> Unit = {},
     onVoice: () -> Unit = {},          // mic in the strip: hand over to a voice typing app
     voiceNote: String? = null,         // "No voice typing app on this phone yet"
-    onVoiceNote: () -> Unit = {}
+    onVoiceNote: () -> Unit = {},
+    slideActions: SlideActions = SlideActions()
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -253,6 +335,43 @@ private fun KeyboardContent(
         else -> symbolRows
     }
 
+    // Hold a letter: accents and symbols (letters page only).
+    fun alternates(key: String): List<String>? =
+        if (symbols) null else Alternates[key]?.map { if (shift != Shift.OFF) it.shifted() else it }
+    fun typeAlternate(text: String) {
+        onText(text)
+        if (shift == Shift.ONCE) shift = Shift.OFF
+    }
+
+    // Slide on space: move the cursor. Slide left from backspace: pick whole words, lift to delete.
+    val cursorSteps = remember { intArrayOf(0) }
+    val spaceSlide = remember(slideActions) {
+        KeySlide(
+            step = CursorStep,
+            onStart = { cursorSteps[0] = 0; slideActions.startCursor() },
+            onMove = { total -> slideActions.moveCursor(total - cursorSteps[0]); cursorSteps[0] = total },
+            onEnd = { }
+        )
+    }
+    val deleteSlide = remember(slideActions) {
+        KeySlide(
+            step = WordStep,
+            onStart = slideActions.startWordDelete,
+            onMove = { total -> slideActions.selectWords(maxOf(0, -total)) },
+            onEnd = { total -> slideActions.finishWordDelete(maxOf(0, -total)) }
+        )
+    }
+    val altPopup = remember { AltPopupState() }
+
+    CompositionLocalProvider(LocalAltPopup provides altPopup) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned {
+                altPopup.origin = it.positionInRoot()
+                altPopup.width = it.size.width.toFloat()
+            }
+    ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -322,7 +441,8 @@ private fun KeyboardContent(
                     label = label(k),
                     modifier = Modifier.weight(1f),
                     hint = hint,
-                    onLongPress = hint?.let { number -> { onText(number) } }
+                    alternates = alternates(k),
+                    onAlternate = ::typeAlternate
                 ) { type(k) }
             }
         }
@@ -330,7 +450,9 @@ private fun KeyboardContent(
         // Row 2: indented by half a key, like a real QWERTY
         Row(Modifier.fillMaxWidth()) {
             if (!symbols) Spacer(Modifier.weight(0.5f))
-            rows[1].forEach { k -> Key(label(k), Modifier.weight(1f)) { type(k) } }
+            rows[1].forEach { k ->
+                Key(label(k), Modifier.weight(1f), alternates = alternates(k), onAlternate = ::typeAlternate) { type(k) }
+            }
             if (!symbols) Spacer(Modifier.weight(0.5f))
         }
 
@@ -358,12 +480,15 @@ private fun KeyboardContent(
                     fontSize = 16
                 ) { moreSymbols = !moreSymbols }
             }
-            rows[2].forEach { k -> Key(label(k), Modifier.weight(1f)) { type(k) } }
+            rows[2].forEach { k ->
+                Key(label(k), Modifier.weight(1f), alternates = alternates(k), onAlternate = ::typeAlternate) { type(k) }
+            }
             Key(
                 label = "",
                 modifier = Modifier.weight(1.5f),
                 color = LocalKeyboardTheme.current.deleteKey ?: SpecialKeyColor,
                 repeat = true,
+                slide = deleteSlide,
                 icon = { BackspaceIcon(LocalKeyboardTheme.current.deleteInk ?: KeyText) }
             ) { onBackspace() }
         }
@@ -398,9 +523,16 @@ private fun KeyboardContent(
                 modifier = Modifier.weight(4f),
                 textColor = HintText,
                 fontSize = 16,
-                onLongPress = onSwitchKeyboard     // hold space → choose another keyboard
+                onLongPress = onSwitchKeyboard,    // hold space → choose another keyboard
+                slide = spaceSlide                 // slide on space → move the cursor
             ) { onText(" ") }
-            Key(".", Modifier.weight(1f), color = SpecialKeyColor) { onText(".") }
+            Key(
+                ".",
+                Modifier.weight(1f),
+                color = SpecialKeyColor,
+                alternates = PeriodAlternates,
+                onAlternate = onText
+            ) { onText(".") }
             Key(
                 label = "",
                 modifier = Modifier.weight(1.5f),
@@ -409,11 +541,18 @@ private fun KeyboardContent(
             ) { onEnter() }
         }
     }
+    altPopup.shown?.let { AltPopupView(it) }
+    }
+    }
 }
 
 /**
  * One key. The whole cell is touchable, including the gap around the drawn key,
  * so there are no "dead zones" between keys. That's a big part of what makes typing feel easy.
+ *
+ * [alternates]: hold the key and a row of accents/symbols opens above it; slide to one and let go.
+ * [slide]: sliding a finger along the key does something (space moves the cursor,
+ * backspace picks words to delete) instead of a tap.
  */
 @Composable
 private fun Key(
@@ -425,38 +564,78 @@ private fun Key(
     hint: String? = null,
     repeat: Boolean = false,
     onLongPress: (() -> Unit)? = null,
+    alternates: List<String>? = null,
+    onAlternate: (String) -> Unit = {},
+    slide: KeySlide? = null,
     icon: (@Composable () -> Unit)? = null,
     hintIcon: (@Composable () -> Unit)? = null,
     onPress: () -> Unit
 ) {
     val view = LocalView.current
     val feedback = LocalKeyFeedback.current
+    val popup = LocalAltPopup.current
     var pressed by remember { mutableStateOf(false) }
     val press by rememberUpdatedState(onPress)
     val longPress by rememberUpdatedState(onLongPress)
+    val alts by rememberUpdatedState(alternates)
+    val pickAlternate by rememberUpdatedState(onAlternate)
+    val slideNow by rememberUpdatedState(slide)
+    val bounds = remember { arrayOf(Rect.Zero) }   // where this key is, for the accents row
+
+    fun tick() {
+        if (feedback.vibrate) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+    }
 
     Box(
         modifier = modifier
             .height(RowHeight)
+            .onGloballyPositioned { bounds[0] = it.boundsInRoot() }
             .pointerInput(repeat, feedback) {
                 awaitEachGesture {
-                    awaitFirstDown()
+                    val down = awaitFirstDown()
                     pressed = true
                     view.keyTap(feedback)
                     try {
-                        if (repeat) {
-                            // Backspace: delete now, then keep deleting while held.
-                            press()
-                            var done = withTimeoutOrNull(RepeatStartMs) { waitForUpOrCancellation(); true }
-                            while (done == null) {
-                                press()
-                                done = withTimeoutOrNull(RepeatEveryMs) { waitForUpOrCancellation(); true }
+                        val s = slideNow
+                        val options = alts
+                        when {
+                            s != null -> {
+                                // Space and backspace: a tap, a hold, or a slide along the key.
+                                val holdMs = when {
+                                    repeat -> RepeatStartMs
+                                    longPress != null -> LongPressMs
+                                    else -> null
+                                }
+                                when (trackSlide(down, holdMs, SlideSlop.toPx(), s.step.toPx(), s, ::tick)) {
+                                    SlideEnd.TAP -> press()
+                                    SlideEnd.HELD -> if (repeat) {
+                                        // Backspace held still: keep deleting while held.
+                                        press()
+                                        var done = withTimeoutOrNull(RepeatEveryMs) { waitForUpOrCancellation(); true }
+                                        while (done == null) {
+                                            press()
+                                            done = withTimeoutOrNull(RepeatEveryMs) { waitForUpOrCancellation(); true }
+                                        }
+                                    } else {
+                                        longPress?.let {
+                                            if (feedback.vibrate) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                            it()
+                                        }
+                                        waitForUpOrCancellation()
+                                    }
+                                    SlideEnd.SLID, SlideEnd.CANCELLED -> Unit
+                                }
                             }
-                        } else {
-                            val onLong = longPress
-                            if (onLong == null) {
-                                if (waitForUpOrCancellation() != null) press()
-                            } else {
+                            repeat -> {
+                                // Backspace: delete now, then keep deleting while held.
+                                press()
+                                var done = withTimeoutOrNull(RepeatStartMs) { waitForUpOrCancellation(); true }
+                                while (done == null) {
+                                    press()
+                                    done = withTimeoutOrNull(RepeatEveryMs) { waitForUpOrCancellation(); true }
+                                }
+                            }
+                            options != null && options.isNotEmpty() -> {
                                 // true = released, false = slid off, null = still holding
                                 val released = withTimeoutOrNull(LongPressMs) {
                                     waitForUpOrCancellation() != null
@@ -466,14 +645,34 @@ private fun Key(
                                     false -> Unit
                                     null -> {
                                         if (feedback.vibrate) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                                        onLong()
-                                        waitForUpOrCancellation()
+                                        chooseAlternate(down, options, bounds[0], popup, ::tick)?.let(pickAlternate)
+                                    }
+                                }
+                            }
+                            else -> {
+                                val onLong = longPress
+                                if (onLong == null) {
+                                    if (waitForUpOrCancellation() != null) press()
+                                } else {
+                                    // true = released, false = slid off, null = still holding
+                                    val released = withTimeoutOrNull(LongPressMs) {
+                                        waitForUpOrCancellation() != null
+                                    }
+                                    when (released) {
+                                        true -> press()
+                                        false -> Unit
+                                        null -> {
+                                            if (feedback.vibrate) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                            onLong()
+                                            waitForUpOrCancellation()
+                                        }
                                     }
                                 }
                             }
                         }
                     } finally {
                         pressed = false
+                        popup.shown = null
                     }
                 }
             }
@@ -512,6 +711,176 @@ private fun Key(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 3.dp, end = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sliding on space / backspace
+// ---------------------------------------------------------------------------
+
+/** Sliding a finger along a key. [onMove] gets the steps from the start (negative = left). */
+private class KeySlide(
+    val step: Dp,
+    val onStart: () -> Unit,
+    val onMove: (total: Int) -> Unit,
+    val onEnd: (total: Int) -> Unit
+)
+
+private enum class SlideEnd { TAP, HELD, SLID, CANCELLED }
+
+/**
+ * Follows one finger on a key. Until it moves more than [slopPx] it's a tap (lifted) or a hold
+ * (still down after [holdMs]). Once it moves, it's a slide: every [stepPx] left or right is one step.
+ */
+private suspend fun AwaitPointerEventScope.trackSlide(
+    down: PointerInputChange,
+    holdMs: Long?,
+    slopPx: Float,
+    stepPx: Float,
+    slide: KeySlide,
+    tick: () -> Unit
+): SlideEnd {
+    val deadline = SystemClock.uptimeMillis() + (holdMs ?: 0L)
+    var sliding = false
+    var anchor = down.position.x
+    var total = 0
+    while (true) {
+        val event = if (!sliding && holdMs != null) {
+            val left = deadline - SystemClock.uptimeMillis()
+            if (left <= 0) return SlideEnd.HELD
+            withTimeoutOrNull(left) { awaitPointerEvent() } ?: return SlideEnd.HELD
+        } else {
+            awaitPointerEvent()
+        }
+        val change = event.changes.firstOrNull { it.id == down.id }
+        if (change == null) {
+            if (sliding) slide.onEnd(0)
+            return SlideEnd.CANCELLED
+        }
+        if (!change.pressed) {
+            if (!sliding) return SlideEnd.TAP
+            slide.onEnd(total)
+            return SlideEnd.SLID
+        }
+        val x = change.position.x
+        if (!sliding && abs(x - anchor) > slopPx) {
+            sliding = true
+            // The first step counts as soon as the finger starts sliding.
+            anchor = x - sign(x - anchor) * stepPx
+            slide.onStart()
+        }
+        if (sliding) {
+            change.consume()
+            val now = ((x - anchor) / stepPx).toInt()
+            if (now != total) {
+                total = now
+                tick()
+                slide.onMove(total)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Accents row (hold a letter)
+// ---------------------------------------------------------------------------
+
+/** Where the accents row is drawn. It's drawn over the keyboard itself, not in a separate window. */
+private class AltPopupState {
+    var shown by mutableStateOf<AltPopup?>(null)
+    var origin = Offset.Zero    // top-left of the keyboard area
+    var width = 0f
+}
+
+/** [reversed]: near the right edge the row opens to the left, so the first choice stays above the key. */
+private data class AltPopup(
+    val options: List<String>,
+    val left: Float,
+    val bottom: Float,
+    val cellWidth: Float,
+    val selected: Int,
+    val reversed: Boolean
+)
+
+private val LocalAltPopup = staticCompositionLocalOf { AltPopupState() }
+
+/**
+ * Opens the accents row above the key and follows the finger along it.
+ * Returns what was chosen when the finger lifts (the first choice if it didn't move).
+ */
+private suspend fun AwaitPointerEventScope.chooseAlternate(
+    down: PointerInputChange,
+    options: List<String>,
+    key: Rect,
+    popup: AltPopupState,
+    tick: () -> Unit
+): String? {
+    val cell = key.width.coerceAtLeast(1f)
+    val width = cell * options.size
+    val keyLeft = key.left - popup.origin.x
+    val reversed = keyLeft + width > popup.width
+    val left = if (reversed) (keyLeft + cell - width).coerceAtLeast(0f) else keyLeft
+    val bottom = key.top - popup.origin.y + KeyGapV.toPx()
+
+    fun optionAt(xInKey: Float): Int {
+        val slot = ((keyLeft + xInKey - left) / cell).toInt().coerceIn(0, options.size - 1)
+        return if (reversed) options.size - 1 - slot else slot
+    }
+
+    popup.shown = AltPopup(options, left, bottom, cell, 0, reversed)
+    try {
+        while (true) {
+            val event = awaitPointerEvent()
+            val change = event.changes.firstOrNull { it.id == down.id } ?: return null
+            change.consume()
+            val shown = popup.shown ?: return null
+            if (!change.pressed) return shown.options[shown.selected]
+            val i = optionAt(change.position.x)
+            if (i != shown.selected) {
+                popup.shown = shown.copy(selected = i)
+                tick()
+            }
+        }
+    } finally {
+        popup.shown = null
+    }
+}
+
+@Composable
+private fun AltPopupView(p: AltPopup) {
+    val density = LocalDensity.current
+    val theme = LocalKeyboardTheme.current
+    val heightPx = with(density) { AltPopupHeight.toPx() }
+    val cellDp = with(density) { p.cellWidth.toDp() }
+    // Solid background even on the photo theme, so the row is easy to read.
+    val background = if (theme.usesPhoto) Color(0xFF1E1E1E) else theme.background
+    val order = if (p.reversed) p.options.indices.reversed() else p.options.indices
+    Row(
+        modifier = Modifier
+            .offset { IntOffset(p.left.roundToInt(), (p.bottom - heightPx).roundToInt().coerceAtLeast(0)) }
+            .height(AltPopupHeight)
+            .clip(RoundedCornerShape(14.dp))
+            .background(background)
+            .border(1.dp, Accent.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+    ) {
+        order.forEach { i ->
+            val selected = i == p.selected
+            Box(
+                modifier = Modifier
+                    .width(cellDp)
+                    .height(AltPopupHeight)
+                    .padding(3.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selected) Accent else Color.Transparent),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = p.options[i],
+                    color = if (selected) theme.inkOnAccent else KeyText,
+                    fontSize = 22.sp
                 )
             }
         }
