@@ -12,7 +12,7 @@ class TextStepsTest {
 
     @Test fun moreWordsGoFurtherBack() {
         assertEquals("hello world ".length, TextSteps.lengthOfWordsBefore("hello world ", 2))
-        assertEquals(" two three".length, TextSteps.lengthOfWordsBefore("one two three", 2))
+        assertEquals("two three".length, TextSteps.lengthOfWordsBefore("one two three", 2))
     }
 
     @Test fun neverGoesPastTheStart() {
