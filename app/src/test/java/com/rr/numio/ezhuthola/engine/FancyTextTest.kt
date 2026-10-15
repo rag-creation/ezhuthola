@@ -35,6 +35,11 @@ class FancyTextTest {
         assertEquals("Ｗｉｄｅ１", FancyText.Wide.apply("Wide1"))
     }
 
+    @Test fun tinyLetters() {
+        assertEquals("ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖᵠʳˢᵗᵘᵛʷˣʸᶻ", FancyText.Tiny.apply("abcdefghijklmnopqrstuvwxyz"))
+        assertEquals("ʰⁱ ²⁰", FancyText.Tiny.apply("Hi 20"))
+    }
+
     @Test fun otherCharactersStayAsTheyAre() {
         assertEquals("𝙷𝚒! മ", FancyText.Mono.apply("Hi! മ"))
     }

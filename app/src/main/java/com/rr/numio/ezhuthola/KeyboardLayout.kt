@@ -246,7 +246,8 @@ fun KeyboardLayout(
     onFontStyle: (String?) -> Unit = {},
     emojiRow: Boolean = false,         // "Quick emoji row" setting
     recentEmoji: List<String> = emptyList(),
-    onEmoji: (String) -> Unit = onText // an emoji was picked: type it and remember it
+    onEmoji: (String) -> Unit = onText, // an emoji was picked: type it and remember it
+    onEmojiRow: (Boolean) -> Unit = {}  // turn the quick emoji row on/off from the keyboard
 ) {
     CompositionLocalProvider(
         LocalKeyboardTheme provides theme,
@@ -287,7 +288,8 @@ fun KeyboardLayout(
                 onFontStyle = onFontStyle,
                 emojiRow = emojiRow,
                 recentEmoji = recentEmoji,
-                onEmoji = onEmoji
+                onEmoji = onEmoji,
+                onEmojiRow = onEmojiRow
             )
         }
     }
@@ -331,7 +333,8 @@ private fun KeyboardContent(
     onFontStyle: (String?) -> Unit = {},
     emojiRow: Boolean = false,
     recentEmoji: List<String> = emptyList(),
-    onEmoji: (String) -> Unit = onText
+    onEmoji: (String) -> Unit = onText,
+    onEmojiRow: (Boolean) -> Unit = {}
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -408,7 +411,9 @@ private fun KeyboardContent(
                 onBackspace = onBackspace,
                 onSpace = { onText(" ") },
                 onClose = { emojiOpen = false },
-                searchEmoji = searchEmoji
+                searchEmoji = searchEmoji,
+                emojiRow = emojiRow,
+                onEmojiRow = onEmojiRow
             )
             return@Column
         }
@@ -467,7 +472,7 @@ private fun KeyboardContent(
             SuggestionStrip(suggestions, onPick)
         }
 
-        if (emojiRow) QuickEmojiRow(recentEmoji, onEmoji)
+        if (emojiRow) QuickEmojiRow(recentEmoji, onEmoji, onHide = { onEmojiRow(false) })
 
         // Row 1: letters, hold for numbers
         Row(Modifier.fillMaxWidth()) {
@@ -1009,6 +1014,8 @@ private fun EmojiPanel(
     onSpace: () -> Unit,
     onClose: () -> Unit,
     searchEmoji: (String) -> EmojiResults,
+    emojiRow: Boolean = false,
+    onEmojiRow: (Boolean) -> Unit = {},
 ) {
     var searching by remember { mutableStateOf(false) }
     if (searching) {
@@ -1043,7 +1050,15 @@ private fun EmojiPanel(
             textColor = Accent,
             fontSize = 16
         ) { onClose() }
-        Key("space", Modifier.weight(5f), textColor = HintText, fontSize = 16) { onSpace() }
+        Key("space", Modifier.weight(3.5f), textColor = HintText, fontSize = 16) { onSpace() }
+        // Recent row switch: shows/hides the quick emoji row above the letter keys.
+        Key(
+            label = if (emojiRow) "Recent ✓" else "Recent",
+            modifier = Modifier.weight(1.5f),
+            color = if (emojiRow) Accent.copy(alpha = 0.22f) else SpecialKeyColor,
+            textColor = if (emojiRow) Accent else KeyText,
+            fontSize = 13
+        ) { onEmojiRow(!emojiRow) }
         Key(
             label = "",
             modifier = Modifier.weight(1.5f),
@@ -2067,7 +2082,7 @@ private fun FontStyleStrip(
 
 /** Your most used emojis, one tap to type. Scrolls sideways. */
 @Composable
-private fun QuickEmojiRow(emojis: List<String>, onEmoji: (String) -> Unit) {
+private fun QuickEmojiRow(emojis: List<String>, onEmoji: (String) -> Unit, onHide: () -> Unit) {
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
@@ -2077,6 +2092,10 @@ private fun QuickEmojiRow(emojis: List<String>, onEmoji: (String) -> Unit) {
     ) {
         items(emojis, key = { it }) { emoji ->
             EmojiResult(emoji) { onEmoji(emoji) }
+        }
+        // At the end of the row: hide it (turn it back on with "Recent" in the emoji panel).
+        item(key = "hide") {
+            StripButton(onHide) { CloseIcon(HintText, Modifier.size(18.dp)) }
         }
     }
 }

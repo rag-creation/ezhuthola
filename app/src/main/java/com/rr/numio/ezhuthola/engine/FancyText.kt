@@ -73,7 +73,20 @@ object FancyText {
     }
     val Wide = Style("wide", "Wide", run(0xFF21, 0xFF41, 0xFF10))
 
-    val all = listOf(Bold, Italic, Script, Outline, Gothic, Sans, Mono, Bubble, Blocks, SmallCaps, Wide)
+    // Tiny raised letters. Unicode has no raised q, so φ-shaped ᵠ stands in (as everyone does),
+    // and capitals use the small ones (most raised capitals don't exist).
+    private const val TINY = "ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖᵠʳˢᵗᵘᵛʷˣʸᶻ"
+    private const val TINY_DIGITS = "⁰¹²³⁴⁵⁶⁷⁸⁹"
+    val Tiny = Style("tiny", "Tiny") { c ->
+        when (c) {
+            in 'a'..'z' -> TINY[c - 'a'].toString()
+            in 'A'..'Z' -> TINY[c - 'A'].toString()
+            in '0'..'9' -> TINY_DIGITS[c - '0'].toString()
+            else -> null
+        }
+    }
+
+    val all = listOf(Bold, Italic, Script, Outline, Gothic, Sans, Mono, Bubble, Blocks, SmallCaps, Wide, Tiny)
 
     fun byId(id: String?): Style? = all.firstOrNull { it.id == id }
 }

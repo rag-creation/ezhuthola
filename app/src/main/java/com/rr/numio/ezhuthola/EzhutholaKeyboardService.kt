@@ -316,7 +316,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     onFontStyle = ::chooseFontStyle,
                     emojiRow = emojiRowOn,
                     recentEmoji = recentEmoji,
-                    onEmoji = ::typeEmoji
+                    onEmoji = ::typeEmoji,
+                    onEmojiRow = ::setEmojiRow
                 )
             }
         }
@@ -574,6 +575,12 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private fun chooseFontStyle(id: String?) {
         commitWord()
         fontStyle = id
+    }
+
+    /** The quick emoji row switched on/off from the keyboard (same setting as in the app). */
+    private fun setEmojiRow(on: Boolean) {
+        emojiRowOn = on
+        prefs.edit().putBoolean(KeyboardSettings.EMOJI_ROW, on).apply()
     }
 
     /** An emoji from the panel, search or quick row: type it and move it to the front of the row. */
