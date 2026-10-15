@@ -1943,45 +1943,66 @@ private fun StickerIcon(color: Color, modifier: Modifier, accent: Color = Accent
 // ---------------------------------------------------------------------------
 
 /**
- * Strip button for font styles: a handwritten N with a yellow sparkle and a yellow swoosh
- * underneath (RR's design). Thin up-strokes, a thicker down-stroke, like pen lettering.
+ * Strip button for font styles: a handwritten N with a looped left stroke, a yellow sparkle
+ * and a yellow swoosh underneath (RR's design). Thin hairlines, thick down-strokes.
  */
 @Composable
 private fun StylesIcon(color: Color = HintText, accent: Color = Accent) {
     Canvas(Modifier.size(24.dp)) {
         val u = size.width / 24f
-        // The N in one pen line: up, down the diagonal, up again with a little flick.
+        // Hairline: the hook, the loop and the thin left stroke up to the top
         drawPath(Path().apply {
-            moveTo(3.4f * u, 18.6f * u)
-            cubicTo(5.6f * u, 15.2f * u, 7.0f * u, 7.6f * u, 9.0f * u, 5.8f * u)
-            cubicTo(10.0f * u, 4.9f * u, 10.6f * u, 6.6f * u, 11.2f * u, 9.2f * u)
-            cubicTo(11.9f * u, 12.4f * u, 12.8f * u, 16.4f * u, 13.9f * u, 17.4f * u)
-            cubicTo(14.9f * u, 18.2f * u, 15.5f * u, 14.6f * u, 16.1f * u, 10.6f * u)
-            cubicTo(16.6f * u, 7.2f * u, 17.4f * u, 4.6f * u, 19.0f * u, 4.4f * u)
-        }, color, style = Stroke(width = 1.15f * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        // Heavier down-stroke on the diagonal
+            moveTo(8.20f * u, 11.20f * u)
+            cubicTo(5.60f * u, 11.40f * u, 1.70f * u, 13.60f * u, 1.50f * u, 16.10f * u)
+            cubicTo(1.40f * u, 18.10f * u, 3.30f * u, 18.90f * u, 5.00f * u, 18.20f * u)
+            cubicTo(7.80f * u, 17.10f * u, 9.80f * u, 12.90f * u, 11.20f * u, 9.80f * u)
+            cubicTo(12.30f * u, 7.40f * u, 13.30f * u, 5.60f * u, 14.30f * u, 5.20f * u)
+        }, color, style = Stroke(width = 0.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        // Thicker underside of the loop
         drawPath(Path().apply {
-            moveTo(10.7f * u, 7.6f * u)
-            cubicTo(11.4f * u, 10.8f * u, 12.4f * u, 15.2f * u, 13.8f * u, 17.2f * u)
-        }, color, style = Stroke(width = 2.7f * u, cap = StrokeCap.Round))
+            moveTo(4.40f * u, 12.40f * u)
+            cubicTo(2.00f * u, 13.60f * u, 0.70f * u, 15.60f * u, 1.00f * u, 17.00f * u)
+            cubicTo(1.30f * u, 18.60f * u, 3.20f * u, 19.20f * u, 5.00f * u, 18.30f * u)
+            cubicTo(3.60f * u, 18.60f * u, 2.20f * u, 17.90f * u, 2.20f * u, 16.40f * u)
+            cubicTo(2.20f * u, 14.90f * u, 3.10f * u, 13.50f * u, 4.40f * u, 12.40f * u)
+            close()
+        }, color)
+        // Main down-stroke: thick, tapering at the top
+        drawPath(Path().apply {
+            moveTo(14.00f * u, 5.00f * u)
+            cubicTo(12.20f * u, 6.60f * u, 11.40f * u, 8.60f * u, 11.60f * u, 11.60f * u)
+            cubicTo(11.80f * u, 13.80f * u, 12.00f * u, 15.60f * u, 12.00f * u, 17.10f * u)
+            cubicTo(12.60f * u, 17.00f * u, 13.20f * u, 16.80f * u, 13.60f * u, 16.40f * u)
+            cubicTo(13.30f * u, 14.40f * u, 12.90f * u, 11.60f * u, 12.90f * u, 9.40f * u)
+            cubicTo(12.90f * u, 7.40f * u, 13.30f * u, 6.00f * u, 14.00f * u, 5.00f * u)
+            close()
+        }, color)
+        // Right stroke: up from the bottom, thinning to a small flick
+        drawPath(Path().apply {
+            moveTo(12.60f * u, 16.90f * u)
+            cubicTo(15.60f * u, 14.60f * u, 17.40f * u, 8.60f * u, 19.40f * u, 5.80f * u)
+            cubicTo(20.40f * u, 4.40f * u, 21.60f * u, 3.50f * u, 22.80f * u, 3.40f * u)
+            cubicTo(23.10f * u, 3.40f * u, 23.00f * u, 3.80f * u, 22.70f * u, 3.80f * u)
+            cubicTo(21.60f * u, 3.90f * u, 20.60f * u, 4.90f * u, 19.80f * u, 6.40f * u)
+            cubicTo(18.20f * u, 9.40f * u, 16.60f * u, 14.40f * u, 13.60f * u, 16.60f * u)
+            close()
+        }, color)
         // Four-point sparkle
-        val cx = 20.3f * u
-        val cy = 11.4f * u
         drawPath(Path().apply {
-            moveTo(cx, cy - 3f * u)
-            quadraticTo(cx + 0.4f * u, cy - 0.4f * u, cx + 2.4f * u, cy)
-            quadraticTo(cx + 0.4f * u, cy + 0.4f * u, cx, cy + 3f * u)
-            quadraticTo(cx - 0.4f * u, cy + 0.4f * u, cx - 2.4f * u, cy)
-            quadraticTo(cx - 0.4f * u, cy - 0.4f * u, cx, cy - 3f * u)
+            moveTo(20.90f * u, 7.00f * u)
+            quadraticTo(21.20f * u, 9.30f * u, 23.30f * u, 9.60f * u)
+            quadraticTo(21.20f * u, 9.90f * u, 20.90f * u, 12.20f * u)
+            quadraticTo(20.60f * u, 9.90f * u, 18.50f * u, 9.60f * u)
+            quadraticTo(20.60f * u, 9.30f * u, 20.90f * u, 7.00f * u)
             close()
         }, accent)
-        // Swoosh, thicker on the left and fading to a point on the right
+        // Swoosh underneath
         drawPath(Path().apply {
-            moveTo(3.0f * u, 22.2f * u)
-            quadraticTo(11f * u, 19.6f * u, 19.8f * u, 19.3f * u)
-            quadraticTo(21f * u, 19.4f * u, 20f * u, 20.0f * u)
-            quadraticTo(11.5f * u, 20.4f * u, 3.6f * u, 22.8f * u)
-            quadraticTo(2.8f * u, 22.8f * u, 3.0f * u, 22.2f * u)
+            moveTo(4.20f * u, 21.70f * u)
+            quadraticTo(12.00f * u, 17.60f * u, 21.40f * u, 16.40f * u)
+            quadraticTo(22.30f * u, 16.50f * u, 21.50f * u, 16.90f * u)
+            quadraticTo(12.60f * u, 17.90f * u, 4.70f * u, 22.10f * u)
+            quadraticTo(3.90f * u, 22.20f * u, 4.20f * u, 21.70f * u)
             close()
         }, accent)
     }
