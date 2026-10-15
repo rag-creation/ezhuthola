@@ -43,6 +43,7 @@ import com.rr.numio.ezhuthola.engine.ClipboardHistory
 import com.rr.numio.ezhuthola.engine.EmojiSearch
 import com.rr.numio.ezhuthola.engine.EnglishInMalayalam
 import com.rr.numio.ezhuthola.engine.EnglishSuggester
+import com.rr.numio.ezhuthola.engine.FancyText
 import com.rr.numio.ezhuthola.engine.MalayalamEngine
 import com.rr.numio.ezhuthola.engine.MalayalamRules
 import com.rr.numio.ezhuthola.engine.MalayalamSuggester
@@ -165,6 +166,13 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var feedback by mutableStateOf(KeyFeedback())
     private var keyHeight by mutableFloatStateOf(1f)
 
+    /** Font style for English letters (FancyText id), null = normal. Back to normal in each new field. */
+    private var fontStyle by mutableStateOf<String?>(null)
+
+    /** Quick emoji row: on/off, and the emojis in it (most recently used first). */
+    private var emojiRowOn by mutableStateOf(true)
+    private var recentEmoji by mutableStateOf(DEFAULT_EMOJI)
+
     /** Where the cursor is, as the app last told us (for the space and backspace slides). */
     private var selStart = -1
     private var selEnd = -1
@@ -185,7 +193,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      * (the "Try it" box). Kept in a field: Android only holds listeners weakly.
      */
     private val lookListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM || key == KeyboardSettings.KEY_HEIGHT) {
+        if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM ||
+            key == KeyboardSettings.KEY_HEIGHT || key == KeyboardSettings.EMOJI_ROW
+        ) {
             mainHandler.post { applySettings() }
         }
     }
@@ -195,6 +205,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         savedStateController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         malayalam = prefs.getBoolean(KeyboardSettings.MALAYALAM, false) // open in the mode you left it
+        recentEmoji = prefs.getString(KeyboardSettings.RECENT_EMOJI, null)
+            ?.split('\n')?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
+            ?: DEFAULT_EMOJI
         clipboard.addPrimaryClipChangedListener(clipListener)
         prefs.registerOnSharedPreferenceChangeListener(lookListener)
 
@@ -298,7 +311,12 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                         if (opensSettings) openKeyboardSettings()
                     },
                     keyHeight = keyHeight,
-                    slideActions = slideActions
+                    slideActions = slideActions,
+                    fontStyle = fontStyle,
+                    onFontStyle = ::chooseFontStyle,
+                    emojiRow = emojiRowOn,
+                    recentEmoji = recentEmoji,
+                    onEmoji = ::typeEmoji
                 )
             }
         }
@@ -357,7 +375,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         noLearning = info != null &&
                 (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
         // `restarting` = same field, the app just refreshed it: keep the current page.
-        if (!restarting) session++
+        if (!restarting) {
+            session++
+            fontStyle = null
+        }
         applySettings()
         captureClipboard()
         undo = null
@@ -475,7 +496,14 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private fun onKeyText(text: String) {
         undo = null
         forgetTapped()
+        val style = FancyText.byId(fontStyle)
         when {
+            // A font style is on: English letters and digits come out styled (𝐁𝐨𝐥𝐝), no suggestions.
+            style != null && !malayalam && !plainField && text.length == 1 &&
+                    (text[0].isAsciiLetter() || text[0] in '0'..'9') -> {
+                commitWord()
+                commit(style.apply(text[0]))
+            }
             // A letter: add it to the word being typed (Manglish or English).
             !plainField && text.length == 1 && text[0].isAsciiLetter() -> {
                 if (word.isEmpty()) resumeWordBeforeCursor()
@@ -517,6 +545,23 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         // A real key event handles selected text and emoji correctly.
         if (undoCorrection()) return
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+    }
+
+    // ---- Font styles and emojis ------------------------------------------------
+
+    private fun chooseFontStyle(id: String?) {
+        commitWord()
+        fontStyle = id
+    }
+
+    /** An emoji from the panel, search or quick row: type it and move it to the front of the row. */
+    private fun typeEmoji(emoji: String) {
+        onKeyText(emoji)
+        val list = (listOf(emoji) + recentEmoji.filter { it != emoji }).take(MAX_RECENT_EMOJI)
+        if (list != recentEmoji) {
+            recentEmoji = list
+            prefs.edit().putString(KeyboardSettings.RECENT_EMOJI, list.joinToString("\n")).apply()
+        }
     }
 
     // ---- Slides: space moves the cursor, backspace swipe deletes words ----------
@@ -760,6 +805,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             vibrate = prefs.getBoolean(KeyboardSettings.VIBRATE, true),
             sound = prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)
         )
+        emojiRowOn = prefs.getBoolean(KeyboardSettings.EMOJI_ROW, true)
         keyHeight = prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)
             .coerceIn(KeyboardSettings.MIN_KEY_HEIGHT, KeyboardSettings.MAX_KEY_HEIGHT)
         clipboardOn = prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)
@@ -1110,6 +1156,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         /** Longest word picked back up or suggested for after the cursor moves. */
         const val MAX_WORD = 30
         const val MAX_DELETE_TEXT = 1000   // backspace swipe looks this far back for words
+        const val MAX_RECENT_EMOJI = 24
+
+        /** The quick emoji row before you've used any emoji. */
+        val DEFAULT_EMOJI = listOf("😂", "❤️", "🙏", "🥰", "🤣", "👍", "😭", "😍", "🔥", "😊", "🥲", "😁", "🤗", "😅", "💯", "🙌")
         const val ML_USER_FILE = "user_words_ml.tsv"
         const val CLIPS_FILE = "pinned_clips.txt"
         const val RECENT_CLIPS_FILE = "recent_clips.txt"

@@ -59,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rr.numio.ezhuthola.engine.Clip
+import com.rr.numio.ezhuthola.engine.FancyText
 import com.rr.numio.ezhuthola.engine.Suggestions
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -105,6 +106,10 @@ private val SlideSlop = 14.dp          // a finger moving less than this is stil
 private val CursorStep = 12.dp         // slide on space: one character per step
 private val WordStep = 26.dp           // slide left from backspace: one word per step
 private val AltPopupHeight = 54.dp     // the accents row that opens above a held key
+private val EmojiRowHeight = 46.dp     // quick emoji row above the keys
+
+/** Extra height panels add so they match the keyboard when the quick emoji row is on. */
+private val LocalPanelExtra = staticCompositionLocalOf { 0.dp }
 
 // ---- Colours: they come from the chosen theme (see KeyboardTheme.kt) ----
 private val KeyboardBg: Color @Composable get() = LocalKeyboardTheme.current.background
@@ -236,7 +241,12 @@ fun KeyboardLayout(
     voiceNote: String? = null,         // "No voice typing app on this phone yet"
     onVoiceNote: () -> Unit = {},
     keyHeight: Float = 1f,             // "Keyboard height" setting, 1 = normal
-    slideActions: SlideActions = SlideActions()
+    slideActions: SlideActions = SlideActions(),
+    fontStyle: String? = null,         // font style in use (FancyText id), null = normal letters
+    onFontStyle: (String?) -> Unit = {},
+    emojiRow: Boolean = false,         // "Quick emoji row" setting
+    recentEmoji: List<String> = emptyList(),
+    onEmoji: (String) -> Unit = onText // an emoji was picked: type it and remember it
 ) {
     CompositionLocalProvider(
         LocalKeyboardTheme provides theme,
@@ -272,7 +282,12 @@ fun KeyboardLayout(
                 onVoice = onVoice,
                 voiceNote = voiceNote,
                 onVoiceNote = onVoiceNote,
-                slideActions = slideActions
+                slideActions = slideActions,
+                fontStyle = fontStyle,
+                onFontStyle = onFontStyle,
+                emojiRow = emojiRow,
+                recentEmoji = recentEmoji,
+                onEmoji = onEmoji
             )
         }
     }
@@ -311,7 +326,12 @@ private fun KeyboardContent(
     onVoice: () -> Unit = {},          // mic in the strip: hand over to a voice typing app
     voiceNote: String? = null,         // "No voice typing app on this phone yet"
     onVoiceNote: () -> Unit = {},
-    slideActions: SlideActions = SlideActions()
+    slideActions: SlideActions = SlideActions(),
+    fontStyle: String? = null,
+    onFontStyle: (String?) -> Unit = {},
+    emojiRow: Boolean = false,
+    recentEmoji: List<String> = emptyList(),
+    onEmoji: (String) -> Unit = onText
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -321,6 +341,7 @@ private fun KeyboardContent(
     var emojiOpen by remember(session) { mutableStateOf(false) }
     var clipboardOpen by remember(session) { mutableStateOf(false) }
     var stickersOpen by remember(session) { mutableStateOf(false) }
+    var stylesOpen by remember(session) { mutableStateOf(false) }   // font styles strip
 
     fun label(key: String) = if (!symbols && shift != Shift.OFF) key.uppercase() else key
 
@@ -363,7 +384,10 @@ private fun KeyboardContent(
     }
     val altPopup = remember { AltPopupState() }
 
-    CompositionLocalProvider(LocalAltPopup provides altPopup) {
+    CompositionLocalProvider(
+        LocalAltPopup provides altPopup,
+        LocalPanelExtra provides if (emojiRow) EmojiRowHeight else 0.dp
+    ) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -380,7 +404,7 @@ private fun KeyboardContent(
     ) {
         if (emojiOpen) {
             EmojiPanel(
-                onEmoji = onText,
+                onEmoji = onEmoji,
                 onBackspace = onBackspace,
                 onSpace = { onText(" ") },
                 onClose = { emojiOpen = false },
@@ -416,10 +440,20 @@ private fun KeyboardContent(
             return@Column
         }
 
-        if (suggestions == null || suggestions.typed.isEmpty()) {
+        if (stylesOpen || fontStyle != null) {
+            // Font styles: pick one, then type. ✕ goes back to normal letters.
+            FontStyleStrip(
+                selected = fontStyle,
+                malayalam = malayalam,
+                onPick = onFontStyle,
+                onSwitchToEnglish = onToggleLanguage,
+                onClose = { onFontStyle(null); stylesOpen = false }
+            )
+        } else if (suggestions == null || suggestions.typed.isEmpty()) {
             // Not typing a word: show the clipboard button.
             IdleStrip(
                 onOpenSettings = onOpenSettings,
+                onOpenStyles = { stylesOpen = true },
                 onOpenClipboard = { onOpenClipboard(); clipboardOpen = true },
                 onOpenStickers = { onOpenStickers(); stickersOpen = true },
                 onOpenEmoji = { emojiOpen = true },
@@ -432,6 +466,8 @@ private fun KeyboardContent(
         } else {
             SuggestionStrip(suggestions, onPick)
         }
+
+        if (emojiRow) QuickEmojiRow(recentEmoji, onEmoji)
 
         // Row 1: letters, hold for numbers
         Row(Modifier.fillMaxWidth()) {
@@ -989,7 +1025,7 @@ private fun EmojiPanel(
     AndroidView(
         modifier = Modifier
             .fillMaxWidth()
-            .height(RowHeight * 3), // search bar + grid = same height as the strip + letter keys
+            .height(RowHeight * 3 + LocalPanelExtra.current), // search bar + grid = same height as the strip + letter keys
         factory = { context ->
             // Dark theme wrapper so the picker matches the keyboard.
             EmojiPickerView(ContextThemeWrapper(context, emojiTheme)).apply {
@@ -1029,6 +1065,7 @@ private fun EmojiSearchPanel(
     onBack: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    Spacer(Modifier.height(LocalPanelExtra.current)) // same height as the keyboard with the emoji row
     val results = remember(query) { if (query.isBlank()) EmojiResults(emptyList()) else searchEmoji(query) }
 
     // Strip: [search box] [results →]
@@ -1378,6 +1415,7 @@ private fun IdleStrip(
     onOpenClipboard: () -> Unit,
     onOpenStickers: () -> Unit,
     onOpenEmoji: () -> Unit,
+    onOpenStyles: () -> Unit = {},
     justCopied: String? = null,
     onPasteJustCopied: () -> Unit = {},
     onVoice: () -> Unit = {},
@@ -1393,6 +1431,7 @@ private fun IdleStrip(
     ) {
         StripButton(onOpenSettings) { SettingsIcon(HintText, Modifier.size(24.dp)) }
         StripButton(onOpenEmoji) { SmileIcon(HintText, Modifier.size(24.dp), accent = Accent) }
+        StripButton(onOpenStyles) { StylesIcon() }
         Box(Modifier.weight(1f).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
             when {
                 voiceNote != null -> VoiceNoteChip(voiceNote, onVoiceNote)
@@ -1548,7 +1587,7 @@ private fun ClipboardPanel(
     Column(
         Modifier
             .fillMaxWidth()
-            .height(RowHeight * 3 + StripHeight) // same height as the letter keyboard + strip
+            .height(RowHeight * 3 + StripHeight + LocalPanelExtra.current) // same height as the letter keyboard + strip
     ) {
         // Header: title on the left, actions on the right
         Row(
@@ -1763,7 +1802,7 @@ private fun StickerPanel(
     Column(
         Modifier
             .fillMaxWidth()
-            .height(RowHeight * 3 + StripHeight) // same height as the letter keyboard + strip
+            .height(RowHeight * 3 + StripHeight + LocalPanelExtra.current) // same height as the letter keyboard + strip
     ) {
         Row(
             modifier = Modifier
@@ -1895,5 +1934,106 @@ private fun StickerIcon(color: Color, modifier: Modifier, accent: Color = Accent
         drawPath(Path().apply { moveTo(8.20f * u, 8.00f * u); lineTo(10.00f * u, 8.00f * u); lineTo(10.00f * u, 9.80f * u); lineTo(8.20f * u, 9.80f * u); close() }, color)
         drawPath(Path().apply { moveTo(14.00f * u, 8.00f * u); lineTo(15.80f * u, 8.00f * u); lineTo(15.80f * u, 9.80f * u); lineTo(14.00f * u, 9.80f * u); close() }, color)
         drawPath(Path().apply { moveTo(8.20f * u, 12.60f * u); lineTo(10.40f * u, 14.40f * u); lineTo(13.60f * u, 14.40f * u) }, color, style = Stroke(1.40f * u, join = StrokeJoin.Miter, cap = StrokeCap.Butt))
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// Font styles and the quick emoji row
+// ---------------------------------------------------------------------------
+
+/** Strip button for font styles: a script A with a yellow underline. */
+@Composable
+private fun StylesIcon() {
+    Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
+        Text("𝓐", color = HintText, fontSize = 20.sp, lineHeight = 22.sp)
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .size(width = 14.dp, height = 2.dp)
+                .background(Accent)
+        )
+    }
+}
+
+/**
+ * [✕] [Normal] [𝐁𝐨𝐥𝐝] [𝐼𝑡𝑎𝑙𝑖𝑐] [𝓢𝓬𝓻𝓲𝓹𝓽]…  Tap a style, then type: English letters come out in it.
+ * Styles only work on English letters, so in Malayalam mode the strip offers to switch.
+ */
+@Composable
+private fun FontStyleStrip(
+    selected: String?,
+    malayalam: Boolean,
+    onPick: (String?) -> Unit,
+    onSwitchToEnglish: () -> Unit,
+    onClose: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(StripHeight)
+            .padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        StripButton(onClose) { CloseIcon(HintText, Modifier.size(20.dp)) }
+        if (malayalam) {
+            Chip(
+                text = "Styles work in English · tap to switch",
+                textColor = Accent,
+                background = Accent.copy(alpha = 0.12f),
+                fontSize = 14
+            ) { onSwitchToEnglish() }
+            return@Row
+        }
+        LazyRow(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            item {
+                val on = selected == null
+                Chip(
+                    text = "Normal",
+                    textColor = if (on) Accent else KeyText,
+                    background = if (on) Accent.copy(alpha = 0.18f) else Color.Transparent,
+                    fontSize = 16,
+                    bold = on
+                ) { onPick(null) }
+            }
+            items(FancyText.all, key = { it.id }) { style ->
+                val on = style.id == selected
+                Chip(
+                    text = style.preview,
+                    textColor = if (on) Accent else KeyText,
+                    background = if (on) Accent.copy(alpha = 0.18f) else Color.Transparent,
+                    fontSize = 17
+                ) { onPick(if (on) null else style.id) }
+            }
+        }
+    }
+}
+
+/** Your most used emojis, one tap to type. Scrolls sideways. */
+@Composable
+private fun QuickEmojiRow(emojis: List<String>, onEmoji: (String) -> Unit) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(EmojiRowHeight)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items(emojis, key = { it }) { emoji ->
+            EmojiResult(emoji) { onEmoji(emoji) }
+        }
+    }
+}
+
+@Composable
+private fun CloseIcon(color: Color, modifier: Modifier) {
+    Canvas(modifier) {
+        val u = size.width / 24f
+        drawLine(color, Offset(5 * u, 5 * u), Offset(19 * u, 19 * u), 2.2f * u, StrokeCap.Round)
+        drawLine(color, Offset(19 * u, 5 * u), Offset(5 * u, 19 * u), 2.2f * u, StrokeCap.Round)
     }
 }

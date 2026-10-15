@@ -76,6 +76,7 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
     var vibrate by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.VIBRATE, true)) }
     var sound by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)) }
     var clipboard by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)) }
+    var emojiRow by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.EMOJI_ROW, true)) }
     var keyHeight by remember {
         mutableFloatStateOf(
             prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)
@@ -128,6 +129,13 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
             sound = it; prefs.edit().putBoolean(KeyboardSettings.KEY_SOUND, it).apply()
         }
         ToggleRow(
+            "Quick emoji row",
+            "Your recent emojis in a row above the keys, one tap to send.",
+            emojiRow
+        ) {
+            emojiRow = it; prefs.edit().putBoolean(KeyboardSettings.EMOJI_ROW, it).apply()
+        }
+        ToggleRow(
             "Clipboard history",
             "Copied text waits in the clipboard panel. Passwords and OTPs are never saved.",
             clipboard
@@ -170,7 +178,7 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
         Text(
             "Tips: hold the space bar to switch to another keyboard. Slide on the space bar to " +
                     "move the cursor. Slide left from backspace to delete whole words. Hold a letter " +
-                    "for accents and symbols (hold e for é, a for @).",
+                    "for accents and symbols (hold e for é, a for @). Tap 𝓐 in the top strip for font styles.",
             color = TextDim,
             fontSize = 13.sp,
             lineHeight = 18.sp,
