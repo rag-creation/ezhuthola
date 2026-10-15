@@ -73,14 +73,15 @@ object FancyText {
     }
     val Wide = Style("wide", "Wide", run(0xFF21, 0xFF41, 0xFF10))
 
-    // Tiny raised letters. Unicode has no raised q, so φ-shaped ᵠ stands in (as everyone does),
-    // and capitals use the small ones (most raised capitals don't exist).
+    // Tiny raised letters. Unicode has no raised q, so φ-shaped ᵠ stands in (as everyone does).
+    // Raised capitals exist for most letters; C F Q S X Y Z have none, so they use the small ones.
     private const val TINY = "ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖᵠʳˢᵗᵘᵛʷˣʸᶻ"
+    private const val TINY_CAPS = "ᴬᴮᶜᴰᴱᶠᴳᴴᴵᴶᴷᴸᴹᴺᴼᴾᵠᴿˢᵀᵁⱽᵂˣʸᶻ"
     private const val TINY_DIGITS = "⁰¹²³⁴⁵⁶⁷⁸⁹"
     val Tiny = Style("tiny", "Tiny") { c ->
         when (c) {
             in 'a'..'z' -> TINY[c - 'a'].toString()
-            in 'A'..'Z' -> TINY[c - 'A'].toString()
+            in 'A'..'Z' -> TINY_CAPS[c - 'A'].toString()
             in '0'..'9' -> TINY_DIGITS[c - '0'].toString()
             else -> null
         }

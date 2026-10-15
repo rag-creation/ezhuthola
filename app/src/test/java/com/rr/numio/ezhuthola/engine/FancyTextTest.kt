@@ -37,7 +37,8 @@ class FancyTextTest {
 
     @Test fun tinyLetters() {
         assertEquals("ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖᵠʳˢᵗᵘᵛʷˣʸᶻ", FancyText.Tiny.apply("abcdefghijklmnopqrstuvwxyz"))
-        assertEquals("ʰⁱ ²⁰", FancyText.Tiny.apply("Hi 20"))
+        assertEquals("ᴴⁱ ²⁰", FancyText.Tiny.apply("Hi 20"))
+        assertEquals("ᴬᴮᶜᴰᴱᶠᴳᴴᴵᴶᴷᴸᴹᴺᴼᴾᵠᴿˢᵀᵁⱽᵂˣʸᶻ", FancyText.Tiny.apply("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
     }
 
     @Test fun otherCharactersStayAsTheyAre() {
