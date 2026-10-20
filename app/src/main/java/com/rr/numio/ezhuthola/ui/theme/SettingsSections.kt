@@ -78,6 +78,7 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
     var clipboard by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)) }
     var emojiRow by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.EMOJI_ROW, true)) }
     var fontStyles by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.FONT_STYLES, true)) }
+    var arabic by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.ARABIC, false)) }
     var keyHeight by remember {
         mutableFloatStateOf(
             prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)
@@ -142,6 +143,16 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
             fontStyles
         ) {
             fontStyles = it; prefs.edit().putBoolean(KeyboardSettings.FONT_STYLES, it).apply()
+        }
+        ToggleRow(
+            "Arabic keyboard (beta)",
+            "Adds Arabic to the leaf key: English, Malayalam, then العربية. Word suggestions included.",
+            arabic
+        ) {
+            arabic = it
+            val edit = prefs.edit().putBoolean(KeyboardSettings.ARABIC, it)
+            if (!it) edit.putBoolean(KeyboardSettings.ARABIC_MODE, false) // back to the leaf's other modes
+            edit.apply()
         }
         ToggleRow(
             "Clipboard history",

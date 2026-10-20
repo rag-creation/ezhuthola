@@ -18,6 +18,10 @@ non-Malayalam entries and word fragments removed, words used fewer than 2 times 
 `app/src/main/assets/en_words.tsv` is adapted from `content/2018/en/en_50k.txt`:
 fragments and swear words removed, common contractions (don't, I'm…) added back.
 
+`app/src/main/assets/ar_words.tsv` (Arabic keyboard, beta) is adapted from `content/2018/ar/ar_50k.txt`
+with `tools/make_ar_words.py`: plain Arabic words only (no diacritics, digits or Latin letters),
+words used fewer than 30 times dropped.
+
 These adapted lists are shared under **CC BY-SA 4.0**, as the license requires.
 
 `app/src/main/assets/ml_extra_words.tsv` is Ezhuthola's own list (GPL-3.0) of common words the

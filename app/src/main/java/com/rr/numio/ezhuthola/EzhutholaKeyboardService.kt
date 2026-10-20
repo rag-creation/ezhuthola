@@ -38,6 +38,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.rr.numio.ezhuthola.engine.ArabicSuggester
 import com.rr.numio.ezhuthola.engine.Clip
 import com.rr.numio.ezhuthola.engine.ClipboardHistory
 import com.rr.numio.ezhuthola.engine.EmojiSearch
@@ -78,6 +79,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     // ---- Keyboard state (Compose redraws the keyboard when these change) ----
 
     private var malayalam by mutableStateOf(false)
+
+    /** Arabic keyboard (beta): its own letters, typed as they are, with word completions. */
+    private var arabic by mutableStateOf(false)
+    /** "Arabic keyboard" switched on in settings: the leaf key then goes English → Malayalam → Arabic. */
+    private var arabicOn = false
     private var suggestions by mutableStateOf<Suggestions?>(null)
 
     /** Goes up by one every time the keyboard opens for a field, so the layout starts fresh. */
@@ -107,10 +113,12 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     @Volatile private var suggester: MalayalamSuggester? = null
     @Volatile private var english: EnglishSuggester? = null
     @Volatile private var emojiSearch: EmojiSearch? = null
+    @Volatile private var arabicSuggester: ArabicSuggester? = null
 
     /** Words this person taught the keyboard. Saved in the app's private files. */
     @Volatile private var mlUser: UserWords? = null
     @Volatile private var enUser: UserWords? = null
+    @Volatile private var arUser: UserWords? = null
 
     /** English words you type (known ones move up) and ones the keyboard didn't know. */
     @Volatile private var enUsed: UserWords? = null
@@ -204,7 +212,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var keyboardRoot: View? = null
 
     /** Password, email and web-address fields always get plain English. */
-    private var plainField = false
+    private var plainField by mutableStateOf(false)
 
     /**
      * A theme picked in the app screen shows at once, even while the keyboard is open
@@ -213,7 +221,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private val lookListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM ||
             key == KeyboardSettings.KEY_HEIGHT || key == KeyboardSettings.EMOJI_ROW ||
-            key == KeyboardSettings.FONT_STYLES
+            key == KeyboardSettings.FONT_STYLES || key == KeyboardSettings.ARABIC
         ) {
             mainHandler.post { applySettings() }
         }
@@ -224,6 +232,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         savedStateController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         malayalam = prefs.getBoolean(KeyboardSettings.MALAYALAM, false) // open in the mode you left it
+        arabicOn = prefs.getBoolean(KeyboardSettings.ARABIC, false)
+        arabic = arabicOn && !malayalam && prefs.getBoolean(KeyboardSettings.ARABIC_MODE, false)
         recentEmoji = prefs.getString(KeyboardSettings.RECENT_EMOJI, null)
             ?.split('\n')?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
             ?: DEFAULT_EMOJI
@@ -278,6 +288,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                 )
             }
             emojiSearch = loadEmojiSearch()
+            // Arabic (beta): loaded only when it's switched on, so nobody else pays for it.
+            if (arabicOn) loadArabic()
         }.start()
     }
 
@@ -287,6 +299,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             setContent {
                 KeyboardLayout(
                     malayalam = malayalam,
+                    arabic = arabic && !plainField, // emails and passwords get the English letters
                     onToggleLanguage = ::toggleLanguage,
                     suggestions = suggestions,
                     onPick = ::pick,
@@ -465,7 +478,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     /** English only: the cursor sits in or right after a word like "yuo", so suggest "you". */
     private fun suggestForWordAtCursor() {
-        if (word.isNotEmpty() || malayalam || plainField || passwordField) return
+        if (word.isNotEmpty() || malayalam || arabic || plainField || passwordField) return
         if (SystemClock.uptimeMillis() < quietUntil) return
         val en = english ?: return
         val ic = currentInputConnection ?: return
@@ -492,7 +505,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      * checked and suggested as one. Not in the middle of a word, and not in Malayalam.
      */
     private fun resumeWordBeforeCursor() {
-        if (malayalam) return
+        if (malayalam || arabic) return
         val ic = currentInputConnection ?: return
         val after = ic.getTextAfterCursor(1, 0)?.toString().orEmpty()
         if (after.isNotEmpty() && isWordChar(after[0])) return
@@ -512,9 +525,20 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         undo = null
         mainHandler.removeCallbacks(showWordAtCursor)
         forgetTapped() // the strip's English suggestions don't belong to the new mode
-        malayalam = !malayalam
-        prefs.edit().putBoolean(KeyboardSettings.MALAYALAM, malayalam).apply()
-        if (plainField) return
+        // English → Malayalam → Arabic (if switched on) → English.
+        val toArabic = malayalam && arabicOn
+        // Arabic letters can't become Manglish (or the other way round): keep the word as it is.
+        if (arabic || toArabic) commitWord()
+        when {
+            arabic -> arabic = false
+            toArabic -> { malayalam = false; arabic = true }
+            else -> malayalam = !malayalam
+        }
+        prefs.edit()
+            .putBoolean(KeyboardSettings.MALAYALAM, malayalam)
+            .putBoolean(KeyboardSettings.ARABIC_MODE, arabic)
+            .apply()
+        if (plainField || arabic) return
         if (word.isNotEmpty()) refreshWord()
         else if (malayalam) convertWordAtCursor()
     }
@@ -547,6 +571,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     (text[0].isAsciiLetter() || text[0] in '0'..'9') -> {
                 commitWord()
                 commit(style.apply(text[0]))
+            }
+            // Arabic: letters (and harakat, and the لا key) build the word, shown as typed.
+            arabic && !plainField && text.isNotEmpty() && text.all(ArabicSuggester::isArabicWordChar) -> {
+                word.append(text)
+                refreshWord()
             }
             // A letter: add it to the word being typed (Manglish or English).
             !plainField && text.length == 1 && text[0].isAsciiLetter() -> {
@@ -783,6 +812,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         val loading = Suggestions(typed = typed, best = typed, words = emptyList())
         val s = if (malayalam) {
             suggester?.suggest(typed) ?: loading
+        } else if (arabic) {
+            arabicSuggester?.suggest(typed) ?: loading
         } else {
             english?.suggest(typed) ?: loading
         }
@@ -799,11 +830,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         val ic = currentInputConnection
         val s = suggestions
         // English: swap in the correction ("setteng" → setting) and remember it for undo.
-        if (!malayalam && s != null && s.best != s.typed) {
+        if (!malayalam && !arabic && s != null && s.best != s.typed) {
             ic?.setComposingText(s.best, 1)
             undo = s.best to s.typed
         }
-        if (!malayalam) noteEnglishWord(s?.best ?: word.toString())
+        if (!malayalam && !arabic) noteEnglishWord(s?.best ?: word.toString())
         ic?.finishComposingText()
         resetWord()
     }
@@ -849,6 +880,13 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     /** Picks up anything changed in the app screen: theme, photo, vibration, sound, clipboard. */
     private fun applySettings() {
         applyWordRequests()
+        val wasArabicOn = arabicOn
+        arabicOn = prefs.getBoolean(KeyboardSettings.ARABIC, false)
+        if (arabicOn && !wasArabicOn && arabicSuggester == null) Thread { loadArabic() }.start()
+        if (!arabicOn && arabic) {
+            commitWord()
+            arabic = false
+        }
         theme = Themes.byId(prefs.getString(KeyboardSettings.THEME, Themes.Numio.id))
         photoDim = prefs.getFloat(KeyboardSettings.PHOTO_DIM, 0.45f)
         feedback = KeyFeedback(
@@ -1054,6 +1092,19 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     private fun now() = System.currentTimeMillis()
 
+    // ---- Arabic (beta) -----------------------------------------------------------
+
+    /** Arabic word list (FrequencyWords, most common first) and the Arabic words you picked. Background thread. */
+    private fun loadArabic() {
+        if (arabicSuggester != null) return
+        val user = readUserWords(AR_USER_FILE)
+        val words = assets.open("ar_words.tsv").bufferedReader().useLines { lines ->
+            lines.map { it.substringBefore('\t') }.filter { it.isNotEmpty() }.toList()
+        }
+        arUser = user
+        arabicSuggester = ArabicSuggester(words, user)
+    }
+
     // ---- Emoji search -----------------------------------------------------------
 
     /**
@@ -1099,7 +1150,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      */
     private fun learn(chosen: String) {
         val typed = suggestions?.typed ?: return
-        if (malayalam && chosen != typed) {
+        if (arabic) {
+            if (!noLearning) arUser?.learn(chosen) // a word picked from the strip comes first next time
+        } else if (malayalam && chosen != typed) {
             mlUser?.learn(chosen)
         } else {
             enUser?.learn(chosen.lowercase())
@@ -1132,6 +1185,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private fun writeChangedWords() {
         for ((words, name) in listOf(
             mlUser to ML_USER_FILE,
+            arUser to AR_USER_FILE,
             enUser to LearnedWords.TAUGHT_FILE,
             enUsed to LearnedWords.USED_FILE,
             enMissing to LearnedWords.MISSING_FILE,
@@ -1215,6 +1269,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         /** The quick emoji row before you've used any emoji. */
         val DEFAULT_EMOJI = listOf("😂", "❤️", "🙏", "🥰", "🤣", "👍", "😭", "😍", "🔥", "😊", "🥲", "😁", "🤗", "😅", "💯", "🙌")
         const val ML_USER_FILE = "user_words_ml.tsv"
+        const val AR_USER_FILE = "user_words_ar.tsv"
         const val CLIPS_FILE = "pinned_clips.txt"
         const val RECENT_CLIPS_FILE = "recent_clips.txt"
         /** How long the "just copied" chip stays in the strip. */

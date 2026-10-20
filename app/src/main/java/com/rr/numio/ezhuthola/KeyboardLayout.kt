@@ -1,5 +1,7 @@
 package com.rr.numio.ezhuthola
 
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -198,6 +200,37 @@ private val Alternates: Map<String, List<String>> = mapOf(
     "m" to listOf("?", "¿")                  // Spanish: ¿
 )
 
+/**
+ * Arabic keyboard (beta): the standard Arabic phone layout (ض on the Q key).
+ * All 28 letters plus ء ة ى ؤ; hold ا ل ي و ت ء for the other forms (أ إ آ, لا, ئ, ة).
+ */
+private val arabicRows = listOf(
+    listOf("ض", "ص", "ث", "ق", "ف", "غ", "ع", "ه", "خ", "ح", "ج"),
+    listOf("ش", "س", "ي", "ب", "ل", "ا", "ت", "ن", "م", "ك", "ط"),
+    listOf("ذ", "ء", "ؤ", "ر", "ى", "ة", "و", "ز", "ظ", "د")
+)
+
+/** Arabic-Indic digits, offered next to the normal ones when holding the top row. */
+private val arabicDigits = "١٢٣٤٥٦٧٨٩٠".map { it.toString() }
+
+private val ArabicAlternates: Map<String, List<String>> = buildMap {
+    // Top row: hold for the number (1–0), then the Arabic-Indic one (١–٠).
+    arabicRows[0].take(10).forEachIndexed { i, k -> put(k, listOf(numberHints[i], arabicDigits[i])) }
+    put("ا", listOf("أ", "إ", "آ", "ٱ"))
+    put("ل", listOf("لا", "لأ", "لإ", "لآ"))
+    put("ي", listOf("ئ", "ى"))
+    put("ى", listOf("ئ", "ي"))
+    put("و", listOf("ؤ"))
+    put("ء", listOf("ئ", "ؤ", "أ", "إ"))
+    put("ت", listOf("ة"))
+}
+
+/** Harakat (short vowels and marks): the key left of ذ types fatha, hold it for the rest. */
+private val Harakat = listOf("َ", "ُ", "ِ", "ّ", "ْ", "ً", "ٌ", "ٍ", "ـ")
+
+/** Hold the period key in Arabic: Arabic question mark, comma and semicolon first. */
+private val ArabicPeriodAlternates = listOf("؟", "!", "،", "؛", ":", "\"", "'", "-", "…")
+
 /** Hold the period key for more punctuation. */
 private val PeriodAlternates = listOf("?", "!", "'", "\"", ":", ";", "-", "…", "¿", "¡")
 
@@ -220,6 +253,7 @@ class SlideActions(
 @Composable
 fun KeyboardLayout(
     malayalam: Boolean,               // yellow ola key = Malayalam mode
+    arabic: Boolean = false,          // Arabic keyboard (beta): Arabic letters
     onToggleLanguage: () -> Unit,
     suggestions: Suggestions?,        // what the strip shows for the word being typed
     onPick: (String) -> Unit,         // user tapped a word in the strip
@@ -266,7 +300,9 @@ fun KeyboardLayout(
     CompositionLocalProvider(
         LocalKeyboardTheme provides theme,
         LocalKeyFeedback provides feedback,
-        LocalKeyHeight provides keyHeight
+        LocalKeyHeight provides keyHeight,
+        // Keys stay where they are on phones set to Arabic (or any right-to-left language).
+        LocalLayoutDirection provides LayoutDirection.Ltr
     ) {
         Box(Modifier.fillMaxWidth()) {
             if (theme.usesPhoto && photo != null) {
@@ -281,7 +317,7 @@ fun KeyboardLayout(
                 Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = photoDim)))
             }
             KeyboardContent(
-                malayalam, onToggleLanguage, suggestions, onPick, onText, onBackspace, onEnter,
+                malayalam, arabic, onToggleLanguage, suggestions, onPick, onText, onBackspace, onEnter,
                 session, startWithNumbers, clips, onOpenClipboard, onPasteClip, onTogglePin,
                 onDeleteClip, onClearClips, onOpenSettings, onSwitchKeyboard, searchEmoji,
                 transparent = theme.usesPhoto && photo != null,
@@ -313,6 +349,7 @@ fun KeyboardLayout(
 @Composable
 private fun KeyboardContent(
     malayalam: Boolean,
+    arabic: Boolean,
     onToggleLanguage: () -> Unit,
     suggestions: Suggestions?,
     onPick: (String) -> Unit,
@@ -371,6 +408,7 @@ private fun KeyboardContent(
     }
 
     val rows = when {
+        !symbols && arabic -> arabicRows
         !symbols -> letterRows
         decor -> decorRows
         moreSymbols -> moreSymbolRows
@@ -379,7 +417,9 @@ private fun KeyboardContent(
 
     // Hold a letter: accents and symbols (letters page only).
     fun alternates(key: String): List<String>? =
-        if (decor) DecorAlternates[key] else if (symbols) null else Alternates[key]?.map { if (shift != Shift.OFF) it.shifted() else it }
+        if (decor) DecorAlternates[key] else if (symbols) null
+        else if (arabic) ArabicAlternates[key]
+        else Alternates[key]?.map { if (shift != Shift.OFF) it.shifted() else it }
     fun typeAlternate(text: String) {
         onText(text)
         if (shift == Shift.ONCE) shift = Shift.OFF
@@ -495,7 +535,7 @@ private fun KeyboardContent(
         // Row 1: letters, hold for numbers
         Row(Modifier.fillMaxWidth()) {
             rows[0].forEachIndexed { i, k ->
-                val hint = if (symbols) null else numberHints[i]
+                val hint = if (symbols) null else numberHints.getOrNull(i)
                 Key(
                     label = label(k),
                     modifier = Modifier.weight(1f),
@@ -508,16 +548,27 @@ private fun KeyboardContent(
 
         // Row 2: indented by half a key, like a real QWERTY
         Row(Modifier.fillMaxWidth()) {
-            if (!symbols) Spacer(Modifier.weight(0.5f))
+            val indent = !symbols && !arabic // Arabic's middle row is full width
+            if (indent) Spacer(Modifier.weight(0.5f))
             rows[1].forEach { k ->
                 Key(label(k), Modifier.weight(1f), alternates = alternates(k), onAlternate = ::typeAlternate) { type(k) }
             }
-            if (!symbols) Spacer(Modifier.weight(0.5f))
+            if (indent) Spacer(Modifier.weight(0.5f))
         }
 
         // Row 3: shift + letters + backspace
         Row(Modifier.fillMaxWidth()) {
-            if (!symbols) {
+            if (!symbols && arabic) {
+                // Arabic has no capitals: this key types fatha, hold it for the other harakat.
+                Key(
+                    label = "ـَ",
+                    modifier = Modifier.weight(1.2f),
+                    color = SpecialKeyColor,
+                    fontSize = 18,
+                    alternates = Harakat,
+                    onAlternate = onText
+                ) { onText(Harakat[0]) }
+            } else if (!symbols) {
                 Key(
                     label = "",
                     modifier = Modifier.weight(1.5f),
@@ -551,7 +602,7 @@ private fun KeyboardContent(
             }
             Key(
                 label = "",
-                modifier = Modifier.weight(1.5f),
+                modifier = Modifier.weight(if (!symbols && arabic) 1.2f else 1.5f),
                 color = LocalKeyboardTheme.current.deleteKey ?: SpecialKeyColor,
                 repeat = true,
                 slide = deleteSlide,
@@ -567,25 +618,35 @@ private fun KeyboardContent(
                 color = SpecialKeyColor,
                 fontSize = 16
             ) { symbols = !symbols; moreSymbols = false; decor = false }
+            val comma = if (arabic) "،" else ","      // Arabic comma in Arabic mode
             Key(
-                label = ",",
+                label = comma,
                 modifier = Modifier.weight(1f),
                 color = SpecialKeyColor,
                 hint = "@",
                 onLongPress = { onText("@") }        // hold comma → @ (emoji has its own strip button)
-            ) { onText(",") }
+            ) { onText(comma) }
 
             // The Ezhuthola key: switches Malayalam <-> English.
             // Malayalam mode = solid yellow key. English mode = dark key, yellow leaf.
             Key(
                 label = "",
                 modifier = Modifier.weight(1.2f),
-                color = if (malayalam) Accent else SpecialKeyColor,
+                // Arabic: a light accent tint, so it can't be mistaken for Malayalam's solid yellow.
+                color = when {
+                    malayalam -> Accent
+                    arabic -> Accent.copy(alpha = 0.25f)
+                    else -> SpecialKeyColor
+                },
                 icon = { OlaIcon(onYellow = malayalam) }
             ) { onToggleLanguage() }
 
             Key(
-                label = if (malayalam) "മലയാളം" else "English",
+                label = when {
+                    malayalam -> "മലയാളം"
+                    arabic -> "العربية"
+                    else -> "English"
+                },
                 modifier = Modifier.weight(4f),
                 textColor = HintText,
                 fontSize = 16,
@@ -596,7 +657,7 @@ private fun KeyboardContent(
                 ".",
                 Modifier.weight(1f),
                 color = SpecialKeyColor,
-                alternates = PeriodAlternates,
+                alternates = if (arabic) ArabicPeriodAlternates else PeriodAlternates,
                 onAlternate = onText
             ) { onText(".") }
             Key(
