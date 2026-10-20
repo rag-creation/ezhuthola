@@ -113,6 +113,9 @@ object Themes {
 /** The theme the keyboard is drawn with (set once at the top of KeyboardLayout). */
 val LocalKeyboardTheme = staticCompositionLocalOf { Themes.Numio }
 
+/** The languages the leaf key switches between. [short] is shown in the menu when you hold it. */
+enum class Language(val short: String) { ENGLISH("EN"), MALAYALAM("മ"), ARABIC("ع") }
+
 /** Vibration and click sound on key presses. */
 data class KeyFeedback(val vibrate: Boolean = true, val sound: Boolean = false)
 
@@ -133,6 +136,7 @@ object KeyboardSettings {
     const val KEY_SOUND = "key_sound"
     const val CLIPBOARD_HISTORY = "clipboard_history"
     const val MALAYALAM = "malayalam"
+    const val MALAYALAM_ON = "malayalam_on"      // Malayalam on the leaf key (Arabic speakers may turn it off)
     const val ARABIC = "arabic"                  // Arabic keyboard (beta) turned on in settings
     const val ARABIC_MODE = "arabic_mode"        // the keyboard was left on Arabic
     const val KEY_HEIGHT = "key_height"          // 0.75 … 1.25, 1 = normal

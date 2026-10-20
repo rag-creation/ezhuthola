@@ -84,6 +84,11 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var arabic by mutableStateOf(false)
     /** "Arabic keyboard" switched on in settings: the leaf key then goes English → Malayalam → Arabic. */
     private var arabicOn = false
+    /** "Malayalam" switched on in settings (on unless you turned it off, e.g. Arabic speakers). */
+    private var malayalamOn = true
+
+    /** Languages on the leaf key, in order (English is always there, for emails and links). */
+    private var languages by mutableStateOf(listOf(Language.ENGLISH, Language.MALAYALAM))
     private var suggestions by mutableStateOf<Suggestions?>(null)
 
     /** Goes up by one every time the keyboard opens for a field, so the layout starts fresh. */
@@ -221,7 +226,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private val lookListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM ||
             key == KeyboardSettings.KEY_HEIGHT || key == KeyboardSettings.EMOJI_ROW ||
-            key == KeyboardSettings.FONT_STYLES || key == KeyboardSettings.ARABIC
+            key == KeyboardSettings.FONT_STYLES || key == KeyboardSettings.ARABIC ||
+            key == KeyboardSettings.MALAYALAM_ON
         ) {
             mainHandler.post { applySettings() }
         }
@@ -233,6 +239,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         malayalam = prefs.getBoolean(KeyboardSettings.MALAYALAM, false) // open in the mode you left it
         arabicOn = prefs.getBoolean(KeyboardSettings.ARABIC, false)
+        malayalamOn = prefs.getBoolean(KeyboardSettings.MALAYALAM_ON, true)
+        languages = enabledLanguages()
+        malayalam = malayalam && malayalamOn
         arabic = arabicOn && !malayalam && prefs.getBoolean(KeyboardSettings.ARABIC_MODE, false)
         recentEmoji = prefs.getString(KeyboardSettings.RECENT_EMOJI, null)
             ?.split('\n')?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
@@ -301,6 +310,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     malayalam = malayalam,
                     arabic = arabic && !plainField, // emails and passwords get the English letters
                     onToggleLanguage = ::toggleLanguage,
+                    languages = languages,
+                    onChooseLanguage = ::setLanguage,
                     suggestions = suggestions,
                     onPick = ::pick,
                     onText = ::onKeyText,
@@ -521,19 +532,35 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      * Switching mid-word converts the word being typed instead of finishing it:
      * type "nal", tap the leaf, and it becomes Malayalam; keep typing "e" → നാളെ.
      */
+    private val language: Language
+        get() = when {
+            malayalam -> Language.MALAYALAM
+            arabic -> Language.ARABIC
+            else -> Language.ENGLISH
+        }
+
+    private fun enabledLanguages(): List<Language> = buildList {
+        add(Language.ENGLISH)
+        if (malayalamOn) add(Language.MALAYALAM)
+        if (arabicOn) add(Language.ARABIC)
+    }
+
+    /** Tap the leaf: the next language you have on (English → Malayalam → Arabic → English). */
     private fun toggleLanguage() {
+        val list = languages
+        setLanguage(list[(list.indexOf(language) + 1) % list.size])
+    }
+
+    /** Switch to [target] (a tap on the leaf, or chosen from the menu when holding it). */
+    private fun setLanguage(target: Language) {
+        if (target == language) return
         undo = null
         mainHandler.removeCallbacks(showWordAtCursor)
         forgetTapped() // the strip's English suggestions don't belong to the new mode
-        // English → Malayalam → Arabic (if switched on) → English.
-        val toArabic = malayalam && arabicOn
         // Arabic letters can't become Manglish (or the other way round): keep the word as it is.
-        if (arabic || toArabic) commitWord()
-        when {
-            arabic -> arabic = false
-            toArabic -> { malayalam = false; arabic = true }
-            else -> malayalam = !malayalam
-        }
+        if (arabic || target == Language.ARABIC) commitWord()
+        malayalam = target == Language.MALAYALAM
+        arabic = target == Language.ARABIC
         prefs.edit()
             .putBoolean(KeyboardSettings.MALAYALAM, malayalam)
             .putBoolean(KeyboardSettings.ARABIC_MODE, arabic)
@@ -883,10 +910,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         val wasArabicOn = arabicOn
         arabicOn = prefs.getBoolean(KeyboardSettings.ARABIC, false)
         if (arabicOn && !wasArabicOn && arabicSuggester == null) Thread { loadArabic() }.start()
-        if (!arabicOn && arabic) {
-            commitWord()
-            arabic = false
-        }
+        malayalamOn = prefs.getBoolean(KeyboardSettings.MALAYALAM_ON, true)
+        languages = enabledLanguages()
+        if (language !in languages) setLanguage(Language.ENGLISH) // its switch was turned off
         theme = Themes.byId(prefs.getString(KeyboardSettings.THEME, Themes.Numio.id))
         photoDim = prefs.getFloat(KeyboardSettings.PHOTO_DIM, 0.45f)
         feedback = KeyFeedback(

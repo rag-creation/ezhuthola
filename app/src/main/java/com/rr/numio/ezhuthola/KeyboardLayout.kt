@@ -255,6 +255,8 @@ fun KeyboardLayout(
     malayalam: Boolean,               // yellow ola key = Malayalam mode
     arabic: Boolean = false,          // Arabic keyboard (beta): Arabic letters
     onToggleLanguage: () -> Unit,
+    languages: List<Language> = listOf(Language.ENGLISH, Language.MALAYALAM), // on the leaf key
+    onChooseLanguage: (Language) -> Unit = {},   // picked from the menu when holding the leaf
     suggestions: Suggestions?,        // what the strip shows for the word being typed
     onPick: (String) -> Unit,         // user tapped a word in the strip
     onText: (String) -> Unit,
@@ -317,7 +319,7 @@ fun KeyboardLayout(
                 Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = photoDim)))
             }
             KeyboardContent(
-                malayalam, arabic, onToggleLanguage, suggestions, onPick, onText, onBackspace, onEnter,
+                malayalam, arabic, onToggleLanguage, languages, onChooseLanguage, suggestions, onPick, onText, onBackspace, onEnter,
                 session, startWithNumbers, clips, onOpenClipboard, onPasteClip, onTogglePin,
                 onDeleteClip, onClearClips, onOpenSettings, onSwitchKeyboard, searchEmoji,
                 transparent = theme.usesPhoto && photo != null,
@@ -351,6 +353,8 @@ private fun KeyboardContent(
     malayalam: Boolean,
     arabic: Boolean,
     onToggleLanguage: () -> Unit,
+    languages: List<Language>,
+    onChooseLanguage: (Language) -> Unit,
     suggestions: Suggestions?,
     onPick: (String) -> Unit,
     onText: (String) -> Unit,
@@ -638,7 +642,10 @@ private fun KeyboardContent(
                     arabic -> Accent.copy(alpha = 0.25f)
                     else -> SpecialKeyColor
                 },
-                icon = { OlaIcon(onYellow = malayalam) }
+                icon = { OlaIcon(onYellow = malayalam) },
+                // Hold the leaf: EN · മ · ع, slide to one and let go to go straight there.
+                alternates = if (languages.size > 2) languages.map { it.short } else null,
+                onAlternate = { short -> languages.firstOrNull { it.short == short }?.let(onChooseLanguage) }
             ) { onToggleLanguage() }
 
             Key(

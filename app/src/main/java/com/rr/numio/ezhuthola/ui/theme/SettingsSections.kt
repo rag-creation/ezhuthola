@@ -79,6 +79,7 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
     var emojiRow by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.EMOJI_ROW, true)) }
     var fontStyles by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.FONT_STYLES, true)) }
     var arabic by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.ARABIC, false)) }
+    var malayalamOn by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.MALAYALAM_ON, true)) }
     var keyHeight by remember {
         mutableFloatStateOf(
             prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)
@@ -144,14 +145,27 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
         ) {
             fontStyles = it; prefs.edit().putBoolean(KeyboardSettings.FONT_STYLES, it).apply()
         }
+        // Languages on the leaf key. English is always there; at least one other stays on.
         ToggleRow(
-            "Arabic keyboard (beta)",
-            "Adds Arabic to the leaf key: English, Malayalam, then العربية. Word suggestions included.",
+            "Malayalam",
+            if (arabic) "Turn off if you only type Arabic and English." else "Manglish to മലയാളം with word suggestions.",
+            malayalamOn
+        ) {
+            if (!it && !arabic) return@ToggleRow // nothing to switch to: keep Malayalam
+            malayalamOn = it
+            prefs.edit().putBoolean(KeyboardSettings.MALAYALAM_ON, it).apply()
+        }
+        ToggleRow(
+            "Arabic (beta)",
+            "Arabic letters (العربية) with word suggestions. Hold the leaf key to choose a language.",
             arabic
         ) {
             arabic = it
             val edit = prefs.edit().putBoolean(KeyboardSettings.ARABIC, it)
-            if (!it) edit.putBoolean(KeyboardSettings.ARABIC_MODE, false) // back to the leaf's other modes
+            if (!it) {
+                edit.putBoolean(KeyboardSettings.ARABIC_MODE, false) // back to the leaf's other modes
+                if (!malayalamOn) { malayalamOn = true; edit.putBoolean(KeyboardSettings.MALAYALAM_ON, true) }
+            }
             edit.apply()
         }
         ToggleRow(
