@@ -137,6 +137,13 @@ All are licensed under the **SIL Open Font License 1.1**; the full licence for e
 
 The font files are unmodified copies from the [Google Fonts repository](https://github.com/google/fonts).
 
+## Logo lettering
+
+The Malayalam word എഴുത്തോല on the Ezhuthola logo and app icon is set in **Manjari Bold**
+by Santhosh Thottingal and the Manjari Project Authors (Swathanthra Malayalam Computing),
+SIL Open Font License 1.1 ([licenses/OFL-manjari.txt](licenses/OFL-manjari.txt)).
+The palm-leaf drawing is RR's own.
+
 ## Libraries
 
 **AndroidX** (Jetpack Compose, Material 3, Core, Lifecycle, Activity, Emoji2 Emoji Picker)
