@@ -1,0 +1,7 @@
+- Better Malayalam from loose Manglish: dh, ndh, jn (ജ്ഞ), nd (ന്ദ, ണ്ഡ), ർ inside words
+- Finds real words despite doubled letters or a skipped ്വ
+- One-typo fixes offered in the strip, never forced
+- Old and new spellings both offered (വർഗം / വർഗ്ഗം)
+- More word endings (കഥാപാത്രമാണ്, കടങ്കഥയ്ക്ക്)
+- 44 new Malayalam words, checked by hand
+- All credits in the About screen
