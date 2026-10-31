@@ -137,6 +137,13 @@ All are licensed under the **SIL Open Font License 1.1**; the full licence for e
 
 The font files are unmodified copies from the [Google Fonts repository](https://github.com/google/fonts).
 
+## Sticker tools
+
+The sticker maker's tools (trace, magic wand, eraser, shapes, background cut-out and the white
+border) are Ezhuthola's own code, written from scratch in Kotlin under GPL-3.0
+(`StickerMakerActivity.kt`, `Stickers.kt`, `engine/StickerMath.kt`). No outside library, AI model
+or online service is used: everything runs on the phone.
+
 ## Logo lettering
 
 The Malayalam word എഴുത്തോല on the Ezhuthola logo and app icon is set in **Manjari Bold**

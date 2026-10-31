@@ -383,9 +383,14 @@ private fun Footer() {
         Spacer(Modifier.height(10.dp))
         Text(
             "Word data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles\n" +
+                "English sounds: CMU Pronouncing Dictionary, Carnegie Mellon University (BSD)\n" +
                 "Spelling list: ESDB/SCOWL by Kevin Atkinson (MIT-like licence)\n" +
                 "Emoji names and keywords: Unicode CLDR and Unicode Emoji data " +
-                "© Unicode, Inc. (Unicode License v3)",
+                "© Unicode, Inc. (Unicode License v3)\n" +
+                "Sticker fonts: Baloo Chettan 2 by Ek Type; Manjari, Gayathri and Chilanka " +
+                "by Swathanthra Malayalam Computing (SIL Open Font License 1.1)\n" +
+                "Built with AndroidX and Jetpack Compose (Apache 2.0)\n" +
+                "Sticker tools (trace, magic wand, eraser, shapes) are Ezhuthola's own code",
             color = TextDim.copy(alpha = 0.7f),
             fontSize = 11.sp,
             lineHeight = 15.sp,

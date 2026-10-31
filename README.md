@@ -121,6 +121,8 @@ Ezhuthola's own work, under **GPL-3.0**:
 - `ml_extra_words.tsv` — common words the subtitle list misses, like place names (കേരളം, തൃശ്ശൂർ, ദുബായ്) and festivals
 - `en_extra_words.tsv` — English chat words (bro, tbh, ngl…), app and phone words, and Kerala and UAE places
 - `emoji_manglish.tsv` — Manglish emoji search words (pwoli, umma…)
+- The sticker maker: trace, magic wand, eraser, shapes and cut-out border are written from scratch in Kotlin, with no outside library or model
+- `ml_test_cases.tsv` — Manglish → Malayalam test cases from real-world typing
 
 Emoji images are drawn by your phone's own emoji font; none are bundled in the app.
 
