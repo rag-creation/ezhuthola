@@ -112,6 +112,43 @@ class LooseManglishTest {
         assertEquals("പറഞ്ഞു", best("paranju"))
     }
 
+    // ---- The six words from real-world testing ----------------------------------------
+
+    @Test fun ghatolkachan() {
+        // ൽ/ത് before k are two spellings of the same sound: ഘടോൽക്കചൻ / ഘടോത്കചൻ.
+        assertEquals("ഘടോത്കചൻ", best("ghatolkachan"))
+        assertEquals("ഘടോത്കചൻ", best("ghatothkachan"))
+    }
+
+    @Test fun markandeyan() {
+        // nd can be ണ്ഡ, and "rk" can stand for ർക്ക.
+        assertEquals("മാർക്കണ്ഡേയൻ", best("markandeyan"))
+        assertEquals("മാർക്കണ്ഡേയൻ", best("markkandeyan"))
+    }
+
+    @Test fun dvandvam() {
+        assertEquals("ദ്വന്ദ്വം", best("dvandvam"))
+        // Skipping ്വ must not turn it into an unrelated shorter word (ദന്ത).
+        assertTrue("ദന്ത" !in strip("dvandva"), strip("dvandva").toString())
+    }
+
+    @Test fun kadankatha() {
+        assertEquals("കടങ്കഥ", best("kadankatha"))
+        assertEquals("കടംകഥ", best("kadamkatha"))
+    }
+
+    @Test fun enteAchante() {
+        assertEquals("എന്റെ", best("ente"))
+        assertEquals("അച്ഛന്റെ", best("achante"))
+    }
+
+    // ---- Old and new spellings are both fine ------------------------------------------
+
+    @Test fun bothSpellingStylesAreOffered() {
+        assertTrue(strip("vargam").containsAll(listOf("വർഗം", "വർഗ്ഗം")))
+        assertTrue(strip("artham").containsAll(listOf("അർഥം", "അർത്ഥം")))
+    }
+
     @Test fun oneTypoAwayCoversTheUsualSlips() {
         val v = MalayalamSuggester.oneTypoAway("abc")
         assertTrue("bc" in v)     // extra letter

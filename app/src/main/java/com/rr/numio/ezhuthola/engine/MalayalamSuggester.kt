@@ -187,7 +187,8 @@ class MalayalamSuggester(
     /** Real words matching [laxKey]: dvandayudham → ദ്വന്ദ്വയുദ്ധം, apprathyaksham → അപ്രത്യക്ഷം. */
     private fun laxMatches(typed: String): List<String> {
         if (!rescuable(typed)) return emptyList()
-        return byCount(laxIndex[laxKey(engine.primary(typed.lowercase()))].orEmpty())
+        val key = laxLength(engine.primary(typed.lowercase()))
+        return byCount(laxIndex[laxKey(engine.primary(typed.lowercase()))].orEmpty().filter { closeIn(it, key) })
     }
 
     /** Real words one typo away: apprathysksham → അപ്രത്യക്ഷം ("s" typed for "a"). */
@@ -195,10 +196,21 @@ class MalayalamSuggester(
         if (!rescuable(typed)) return emptyList()
         val found = LinkedHashSet<String>()
         for (variant in oneTypoAway(typed.lowercase())) {
-            laxIndex[laxKey(engine.primary(variant))]?.let(found::addAll)
+            // A typo fix may still be doubled differently, but must not also skip a ്വ.
+            val spelled = engine.primary(variant)
+            val key = undoubledKey(spelled)
+            laxIndex[laxKey(spelled)]?.forEach { if (undoubledKey(it) == key) found += it }
         }
         return byCount(found)
     }
+
+    /**
+     * A rescued word may not be much shorter or longer than what was typed: skipping one ്വ is
+     * fine (dhvandayudham), turning dvandva into ദന്ത is not.
+     */
+    private fun laxLength(word: String) = looseKey(word).length
+    private fun closeIn(word: String, typedLength: Int) =
+        kotlin.math.abs(looseKey(word).length - typedLength) <= MAX_LENGTH_GAP
 
     private fun rescuable(typed: String) =
         typed.length >= RESCUE_MIN_LENGTH && typed.all { it in 'a'..'z' || it in 'A'..'Z' }
@@ -289,6 +301,9 @@ class MalayalamSuggester(
             "ഷ്ട്ട" to "ഷ്ട",                 // ishttam → ഇഷ്ടം
             "ന്ദ" to "ണ്ട",                   // nd: chandanam → ചന്ദനം, not only ണ്ട
             "ദ്ധ" to "ദ", "ധ്ധ" to "ദ",       // yudham → യുദ്ധം (dh is often ദ്ധ)
+            "ണ്ഡ" to "ണ്ട",                   // nd: markandeyan → മാർക്കണ്ഡേയൻ
+            "ത്ക" to "ല്ക", "ൽക" to "ല്ക",   // ghatolkachan → ഘടോത്കചൻ / ഘടോൽക്കചൻ
+            "ത്പ" to "ല്പ", "ൽപ" to "ല്പ",   // uthpannam / ulpannam → ഉത്പന്നം / ഉൽപ്പന്നം
 
             "\u0D4D\u0D30\u0D41" to "\u0D43", "\u0D4D\u0D30\u0D3F" to "\u0D43", // ്രു, ്രി → ൃ
         )
@@ -305,6 +320,9 @@ class MalayalamSuggester(
         /** Words shorter than this are too easy to "fix" into something else. */
         private const val RESCUE_MIN_LENGTH = 5
         private const val RESCUE_MAX = 3
+
+        /** How many letters/signs a rescued word may differ in length from what was typed. */
+        private const val MAX_LENGTH_GAP = 2
 
         /** Keys next to each other on QWERTY: the usual slips (s for a, n for m…). */
         private val NEIGHBOURS: Map<Char, String> = mapOf(
@@ -335,6 +353,9 @@ class MalayalamSuggester(
          */
         internal fun laxKey(word: String): String =
             looseKey(word).replace("\u0D4D\u0D35", "").replace(doubled, "$1")
+
+        /** [looseKey] with doubled letters made single, but ്വ kept. */
+        private fun undoubledKey(word: String): String = looseKey(word).replace(doubled, "$1")
 
         private val doubled = Regex("(\\p{L})\u0D4D\\1")
 
