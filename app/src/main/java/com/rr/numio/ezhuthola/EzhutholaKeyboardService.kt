@@ -262,6 +262,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                 EnglishInMalayalam.fromTsv(it)
             }
             suggester = MalayalamSuggester(MalayalamEngine(rules), words, userWords = ml, english = englishInMl)
+                .also { it.warmUp() }
             // Ezhuthola's own chat words (bro, tbh, ngl) are merged into the subtitle list.
             // Manglish chat words (machane, kazhicho, vave) join them: never corrected, suggested.
             val enExtra = assets.open("en_extra_words.tsv").bufferedReader().use { it.readLines() } +
