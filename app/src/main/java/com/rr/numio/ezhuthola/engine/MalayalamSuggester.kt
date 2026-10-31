@@ -87,6 +87,7 @@ class MalayalamSuggester(
     private val splitter = SuffixSplitter(realWords = { manglish ->
         // The base may be an English word: cinema + kk → സിനിമ + യ്ക്ക്, phone + inte → ഫോൺ + ിന്റെ.
         val bases = pool(manglish).also { set -> english?.of(manglish)?.let { set += it.malayalam } }
+        bases += laxMatches(manglish)   // markandeyante: മാർക്കണ്ഡേയൻ is only a lax match for "markandeyan"
         bases.map { it to frequencies.of(it) }.filter { it.second > 0 }.sortedByDescending { it.second }
     })
 
@@ -148,7 +149,8 @@ class MalayalamSuggester(
         }
 
         // Chat shortcuts: "aan" is almost always ആണ് (is), rarely ആൺ (male).
-        chatShortcut(typed.lowercase())?.let { word ->
+        val shortcut = chatShortcut(typed.lowercase())
+        shortcut?.let { word ->
             if (ranked.none { userWords.count(it) > userWords.count(word) }) {
                 ranked = (listOf(word) + ranked.filter { it != word }).take(maxShown)
             }
@@ -156,12 +158,14 @@ class MalayalamSuggester(
 
         // An English word ("four", "media"): its Malayali spelling, first or second.
         val en = if (withEnglish) english?.of(typed) else null
-        if (en != null && typed.length >= 2) {
+        // (Already first, e.g. ee → ഈ: nothing to move.)
+        if (en != null && typed.length >= 2 && ranked.firstOrNull() != en.malayalam) {
             val spelled = en.malayalam
             val others = ranked.filter { it != spelled }
             val best = others.firstOrNull()
             val picked = best != null && userWords.count(best) > userWords.count(spelled)
-            val englishFirst = !picked && (userWords.count(spelled) > 0 || best == null ||
+            // A chat shortcut wins over the English reading: peru is പേര്, not the country.
+            val englishFirst = !picked && shortcut == null && (userWords.count(spelled) > 0 || best == null ||
                 prefersEnglish(en.perMillion, frequencies.perMillion(best)))
             ranked = (if (englishFirst) listOf(spelled) + others else listOf(best!!, spelled) + others.drop(1))
                 .take(maxShown)
@@ -241,6 +245,8 @@ class MalayalamSuggester(
         /** Manglish chat spellings that mean a different word than the letters say. */
         private val CHAT_SHORTCUTS = mapOf(
             "aan" to "ആണ്",
+            "peru" to "പേര്",      // name; പറൂ stays in the strip
+            "ee" to "ഈ",           // "this": the bare letter ഇ is almost never meant
             "mandi" to "മന്തി",   // the dish; മണ്ടി (fool) stays in the strip
         )
 
@@ -281,7 +287,8 @@ class MalayalamSuggester(
             put('ആ', "അ"); put('ഈ', "ഇ"); put('ഊ', "ഉ"); put('ഏ', "എ"); put('ഓ', "ഒ")
             // letters Manglish typers really mix up (g/k, b/p stay separate: people type those right)
             put('ഖ', "ക"); put('ഘ', "ഗ"); put('ഛ', "ച"); put('ഝ', "ജ")   // kh/k, gh/g, chh/ch, jh/j
-            put('ഠ', "ട"); put('ഢ', "ഡ"); put('ഥ', "ത"); put('ധ', "ദ")   // aspirates
+            put('ഠ', "ത"); put('ഢ', "ദ"); put('ഥ', "ത"); put('ധ', "ദ")   // aspirates (ട→ത, ഡ→ദ below)
+            put('ഃ', "")                                                  // dukham → ദുഃഖം
             put('ഫ', "പ"); put('ഭ', "ബ")
             put('ട', "ത")                                                 // t: ട or ത
             put('ഡ', "ദ")                                                 // d: ദ or ഡ
@@ -302,6 +309,8 @@ class MalayalamSuggester(
             "ന്ദ" to "ണ്ട",                   // nd: chandanam → ചന്ദനം, not only ണ്ട
             "ദ്ധ" to "ദ", "ധ്ധ" to "ദ",       // yudham → യുദ്ധം (dh is often ദ്ധ)
             "ണ്ഡ" to "ണ്ട",                   // nd: markandeyan → മാർക്കണ്ഡേയൻ
+            "ത്ഥ" to "ത",                     // artham → അർത്ഥം / അർഥം
+            "ഞ്ജ" to "ഞ്ഞ",                   // anuranjanam → അനുരഞ്ജനം
             "ത്ക" to "ല്ക", "ൽക" to "ല്ക",   // ghatolkachan → ഘടോത്കചൻ / ഘടോൽക്കചൻ
             "ത്പ" to "ല്പ", "ൽപ" to "ല്പ",   // uthpannam / ulpannam → ഉത്പന്നം / ഉൽപ്പന്നം
 
