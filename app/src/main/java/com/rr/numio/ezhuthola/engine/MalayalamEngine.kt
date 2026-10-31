@@ -105,6 +105,10 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
         data class Other(val text: String) : Seg
     }
 
+    /** Just the best reading, no alternatives: cheap enough to try many typo fixes per keystroke. */
+    fun primary(input: String): String =
+        if (input.isEmpty()) "" else render(parse(normalizeAutoCapital(input)), uAsVirama = false)
+
     fun transliterate(input: String): Transliteration {
         if (input.isEmpty()) return Transliteration("", emptyList())
         val segments = parse(normalizeAutoCapital(input))
@@ -224,6 +228,12 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
                                 append(seg.base).append(seg.vowelSign ?: "")  // kandu → കണ്ടു
                             }
 
+                        // A dead r before another consonant is the chillu ർ, the way Malayalam is
+                        // written today: karthika → കാർത്തിക, party → പാർട്ടി. Not before y (ധൈര്യം).
+                        !isLast && !seg.doubled && seg.base in R_LETTERS &&
+                            (segments[index + 1] as? Seg.Consonant)?.base?.startsWith("യ") == false ->
+                            append(rules.chilluByLetter.getValue(seg.base))
+
                         // Dead consonant in the middle: joins the next consonant.
                         !isLast -> {
                             append(seg.base)
@@ -276,6 +286,10 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
             }
         }
         return variants
+    }
+
+    private companion object {
+        val R_LETTERS = setOf("ര", "റ")
     }
 
     private fun <T> List<T>.replaced(index: Int, item: T): List<T> =
