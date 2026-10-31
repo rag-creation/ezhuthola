@@ -1,8 +1,7 @@
-- Better Malayalam from loose Manglish: dh, ndh, jn (ജ്ഞ), nd (ന്ദ, ണ്ഡ) and ർ inside words
-- Real words found even with doubled letters or a skipped ്വ (apprathyaksham, dvandvayudham)
+- Better Malayalam from loose Manglish: dh, ndh, jn (ജ്ഞ), nd (ന്ദ, ണ്ഡ), ർ inside words
+- Finds real words despite doubled letters or a skipped ്വ
 - One-typo fixes offered in the strip, never forced
-- Old and new spellings both offered (വർഗം / വർഗ്ഗം, അർഥം / അർത്ഥം)
-- Word endings: കഥാപാത്രമാണ്, കടങ്കഥയ്ക്ക്, മാർക്കണ്ഡേയന്റെ
+- Old and new spellings both offered (വർഗം / വർഗ്ഗം)
+- More word endings (കഥാപാത്രമാണ്, കടങ്കഥയ്ക്ക്)
 - 44 new Malayalam words, checked by hand
-- ee → ഈ and peru → പേര് come first
-- All credits shown in the About screen
+- All credits in the About screen
