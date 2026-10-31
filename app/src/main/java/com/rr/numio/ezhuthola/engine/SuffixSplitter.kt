@@ -49,6 +49,12 @@ class SuffixSplitter(
                         add(word.dropLast(1) + "ത്ത" + malayalam, n)
                     }
                 }
+                // ം + "is/and/became": കഥാപാത്രം + ാണ് → കഥാപാത്രമാണ്, സ്നേഹം + ും → സ്നേഹമും
+                if (malayalam in AFTER_ANUSWARAM) {
+                    best(base) { it.last() == ANUSWARAM }?.let { (word, n) ->
+                        add(word.dropLast(1) + "മ" + malayalam, n)
+                    }
+                }
                 // chillu: അച്ഛൻ + ോട് → അച്ഛനോട്
                 best(base) { it.last() in CHILLU_BASE }?.let { (word, n) ->
                     add(word.dropLast(1) + CHILLU_BASE.getValue(word.last()) + malayalam, n)
@@ -103,6 +109,9 @@ class SuffixSplitter(
         /** Chillu → the full letter it becomes before a vowel. */
         private val CHILLU_BASE = mapOf('ൻ' to "ന", 'ൺ' to "ണ", 'ർ' to "ര", 'ൽ' to "ല", 'ൾ' to "ള")
 
+        /** Endings a ം word takes as മ + sign (the case endings go through ത്ത instead). */
+        private val AFTER_ANUSWARAM = setOf("ാണ്", "ാണോ", "ായി", "ും", "ോ", "െന്താണ്")
+
         /** "y" after i/e/a, "v" after u: kuttiyude, guruvinte. */
         private val GLIDES = mapOf('y' to "യ", 'v' to "വ")
 
@@ -127,8 +136,10 @@ class SuffixSplitter(
             // with
             "odum" to "ോടും", "odu" to "ോട്", "od" to "ോട്", "ode" to "ോടെ",
             // is / and / became
+            // what is …?: artham + enthanu → അർത്ഥമെന്താണ്
+            "enthaanu" to "െന്താണ്", "enthanu" to "െന്താണ്",
             "aano" to "ാണോ", "ano" to "ാണോ", "aanu" to "ാണ്", "anu" to "ാണ്",
-            "aayi" to "ായി", "ayi" to "ായി", "um" to "ും",
+            "aayi" to "ായി", "ayi" to "ായി", "um" to "ും", "o" to "ോ",
             // object: അവനെ, കേരളത്തെ
             "e" to "െ",
             // plural
@@ -136,6 +147,9 @@ class SuffixSplitter(
             "kalum" to "കളും", "kale" to "കളെ", "kal" to "കൾ",
             "maarude" to "മാരുടെ", "maar" to "മാർ",
             // to (dative)
+            // after a vowel, typed with its y: kadankathaykku → കടങ്കഥയ്ക്ക്
+            "ykkaayi" to "യ്ക്കായി", "ykkayi" to "യ്ക്കായി", "ykkum" to "യ്ക്കും",
+            "ykku" to "യ്ക്ക്", "ykk" to "യ്ക്ക്",
             "kkaayi" to "ക്കായി", "kkayi" to "ക്കായി", "kkum" to "ക്കും", "kku" to "ക്ക്", "kk" to "ക്ക്",
         ).sortedByDescending { it.first.length }
     }

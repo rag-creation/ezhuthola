@@ -73,14 +73,30 @@ class MalayalamSuggester(
         }
     }
 
+    /** Looser still ([laxKey]): only used when nothing real turned up. Built on first use. */
+    private val laxIndex: Map<String, List<String>> by lazy {
+        buildMap<String, MutableList<String>> {
+            for (word in frequencies.words) {
+                val list = getOrPut(laxKey(word)) { mutableListOf() }
+                if (list.size < 4) list += word
+            }
+        }
+    }
+
     /** Base word + ending, for forms the word list doesn't have ("keralathil" → കേരളത്തിൽ). */
     private val splitter = SuffixSplitter(realWords = { manglish ->
         // The base may be an English word: cinema + kk → സിനിമ + യ്ക്ക്, phone + inte → ഫോൺ + ിന്റെ.
         val bases = pool(manglish).also { set -> english?.of(manglish)?.let { set += it.malayalam } }
+        bases += laxMatches(manglish)   // markandeyante: മാർക്കണ്ഡേയൻ is only a lax match for "markandeyan"
         bases.map { it to frequencies.of(it) }.filter { it.second > 0 }.sortedByDescending { it.second }
     })
 
     fun suggest(typed: String): Suggestions = suggest(typed, withEnglish = true)
+
+    /** Builds the typo-match index now, off the main thread, so the first typo doesn't stutter. */
+    fun warmUp() {
+        laxIndex.size
+    }
 
     private fun suggest(typed: String, withEnglish: Boolean): Suggestions {
         if (typed.isEmpty()) return Suggestions("", "", emptyList())
@@ -118,8 +134,23 @@ class MalayalamSuggester(
             compareByDescending<String> { userWords.count(it) }.thenByDescending(::score)
         ).take(maxShown)
 
+        // Looser spellings (skipped ്വ, doubled letters) go right after the real words found so
+        // far, ahead of made-up spellings: dhvandayudham → ദ്വന്ദ്വയുദ്ധം too, not only ദ്വന്ദയുദ്ധം.
+        val realCount = ranked.count { score(it) > 0 || userWords.count(it) > 0 }
+        val spelled = laxMatches(typed).filter { it !in ranked.take(realCount) }
+        if (spelled.isNotEmpty()) {
+            ranked = (ranked.take(realCount) + spelled + ranked.drop(realCount)).distinct().take(maxShown)
+        } else if (realCount == 0) {
+            // Still nothing real: one-typo fixes. Offered after what was typed, never in its place.
+            val fixed = typoFixes(typed)
+            if (fixed.isNotEmpty()) {
+                ranked = (ranked.take(1) + fixed + ranked.drop(1)).distinct().take(maxShown)
+            }
+        }
+
         // Chat shortcuts: "aan" is almost always ആണ് (is), rarely ആൺ (male).
-        chatShortcut(typed.lowercase())?.let { word ->
+        val shortcut = chatShortcut(typed.lowercase())
+        shortcut?.let { word ->
             if (ranked.none { userWords.count(it) > userWords.count(word) }) {
                 ranked = (listOf(word) + ranked.filter { it != word }).take(maxShown)
             }
@@ -127,12 +158,14 @@ class MalayalamSuggester(
 
         // An English word ("four", "media"): its Malayali spelling, first or second.
         val en = if (withEnglish) english?.of(typed) else null
-        if (en != null && typed.length >= 2) {
+        // (Already first, e.g. ee → ഈ: nothing to move.)
+        if (en != null && typed.length >= 2 && ranked.firstOrNull() != en.malayalam) {
             val spelled = en.malayalam
             val others = ranked.filter { it != spelled }
             val best = others.firstOrNull()
             val picked = best != null && userWords.count(best) > userWords.count(spelled)
-            val englishFirst = !picked && (userWords.count(spelled) > 0 || best == null ||
+            // A chat shortcut wins over the English reading: peru is പേര്, not the country.
+            val englishFirst = !picked && shortcut == null && (userWords.count(spelled) > 0 || best == null ||
                 prefersEnglish(en.perMillion, frequencies.perMillion(best)))
             ranked = (if (englishFirst) listOf(spelled) + others else listOf(best!!, spelled) + others.drop(1))
                 .take(maxShown)
@@ -149,6 +182,45 @@ class MalayalamSuggester(
         }
         return pool
     }
+
+    /*
+     * Malayalis add or drop "h" loosely, double letters by feel, skip rare conjuncts, and
+     * fingers slip. These two catch what loose matching misses.
+     */
+
+    /** Real words matching [laxKey]: dvandayudham → ദ്വന്ദ്വയുദ്ധം, apprathyaksham → അപ്രത്യക്ഷം. */
+    private fun laxMatches(typed: String): List<String> {
+        if (!rescuable(typed)) return emptyList()
+        val key = laxLength(engine.primary(typed.lowercase()))
+        return byCount(laxIndex[laxKey(engine.primary(typed.lowercase()))].orEmpty().filter { closeIn(it, key) })
+    }
+
+    /** Real words one typo away: apprathysksham → അപ്രത്യക്ഷം ("s" typed for "a"). */
+    private fun typoFixes(typed: String): List<String> {
+        if (!rescuable(typed)) return emptyList()
+        val found = LinkedHashSet<String>()
+        for (variant in oneTypoAway(typed.lowercase())) {
+            // A typo fix may still be doubled differently, but must not also skip a ്വ.
+            val spelled = engine.primary(variant)
+            val key = undoubledKey(spelled)
+            laxIndex[laxKey(spelled)]?.forEach { if (undoubledKey(it) == key) found += it }
+        }
+        return byCount(found)
+    }
+
+    /**
+     * A rescued word may not be much shorter or longer than what was typed: skipping one ്വ is
+     * fine (dhvandayudham), turning dvandva into ദന്ത is not.
+     */
+    private fun laxLength(word: String) = looseKey(word).length
+    private fun closeIn(word: String, typedLength: Int) =
+        kotlin.math.abs(looseKey(word).length - typedLength) <= MAX_LENGTH_GAP
+
+    private fun rescuable(typed: String) =
+        typed.length >= RESCUE_MIN_LENGTH && typed.all { it in 'a'..'z' || it in 'A'..'Z' }
+
+    private fun byCount(words: Collection<String>) =
+        words.distinct().sortedByDescending { frequencies.of(it) }.take(RESCUE_MAX)
 
     /**
      * The English reading wins when the Malayalam reading isn't a real word, or when the English
@@ -173,6 +245,8 @@ class MalayalamSuggester(
         /** Manglish chat spellings that mean a different word than the letters say. */
         private val CHAT_SHORTCUTS = mapOf(
             "aan" to "ആണ്",
+            "peru" to "പേര്",      // name; പറൂ stays in the strip
+            "ee" to "ഈ",           // "this": the bare letter ഇ is almost never meant
             "mandi" to "മന്തി",   // the dish; മണ്ടി (fool) stays in the strip
         )
 
@@ -213,7 +287,8 @@ class MalayalamSuggester(
             put('ആ', "അ"); put('ഈ', "ഇ"); put('ഊ', "ഉ"); put('ഏ', "എ"); put('ഓ', "ഒ")
             // letters Manglish typers really mix up (g/k, b/p stay separate: people type those right)
             put('ഖ', "ക"); put('ഘ', "ഗ"); put('ഛ', "ച"); put('ഝ', "ജ")   // kh/k, gh/g, chh/ch, jh/j
-            put('ഠ', "ട"); put('ഢ', "ഡ"); put('ഥ', "ത"); put('ധ', "ദ")   // aspirates
+            put('ഠ', "ത"); put('ഢ', "ദ"); put('ഥ', "ത"); put('ധ', "ദ")   // aspirates (ട→ത, ഡ→ദ below)
+            put('ഃ', "")                                                  // dukham → ദുഃഖം
             put('ഫ', "പ"); put('ഭ', "ബ")
             put('ട', "ത")                                                 // t: ട or ത
             put('ഡ', "ദ")                                                 // d: ദ or ഡ
@@ -231,6 +306,13 @@ class MalayalamSuggester(
             "ച്ഛ" to "ച", "ച്ച" to "ച",
             "ങ്ക" to "ങ", "ങ്ങ" to "ങ",     // bhayangara → ഭയങ്കര
             "ഷ്ട്ട" to "ഷ്ട",                 // ishttam → ഇഷ്ടം
+            "ന്ദ" to "ണ്ട",                   // nd: chandanam → ചന്ദനം, not only ണ്ട
+            "ദ്ധ" to "ദ", "ധ്ധ" to "ദ",       // yudham → യുദ്ധം (dh is often ദ്ധ)
+            "ണ്ഡ" to "ണ്ട",                   // nd: markandeyan → മാർക്കണ്ഡേയൻ
+            "ത്ഥ" to "ത",                     // artham → അർത്ഥം / അർഥം
+            "ഞ്ജ" to "ഞ്ഞ",                   // anuranjanam → അനുരഞ്ജനം
+            "ത്ക" to "ല്ക", "ൽക" to "ല്ക",   // ghatolkachan → ഘടോത്കചൻ / ഘടോൽക്കചൻ
+            "ത്പ" to "ല്പ", "ൽപ" to "ല്പ",   // uthpannam / ulpannam → ഉത്പന്നം / ഉൽപ്പന്നം
 
             "\u0D4D\u0D30\u0D41" to "\u0D43", "\u0D4D\u0D30\u0D3F" to "\u0D43", // ്രു, ്രി → ൃ
         )
@@ -243,6 +325,48 @@ class MalayalamSuggester(
 
         /** Manglish "tt" inside a word is often റ്റ: mattoru → മറ്റൊരു. Not at the end ("but" ≠ ബൂത്ത്). */
         private val rtta = Regex("റ്റ(?!്$)")
+
+        /** Words shorter than this are too easy to "fix" into something else. */
+        private const val RESCUE_MIN_LENGTH = 5
+        private const val RESCUE_MAX = 3
+
+        /** How many letters/signs a rescued word may differ in length from what was typed. */
+        private const val MAX_LENGTH_GAP = 2
+
+        /** Keys next to each other on QWERTY: the usual slips (s for a, n for m…). */
+        private val NEIGHBOURS: Map<Char, String> = mapOf(
+            'q' to "wa", 'w' to "qes", 'e' to "wrd", 'r' to "etf", 't' to "ryg", 'y' to "tuh",
+            'u' to "yij", 'i' to "uok", 'o' to "ipl", 'p' to "o", 'a' to "qsz", 's' to "awdz",
+            'd' to "sfe", 'f' to "dgr", 'g' to "fht", 'h' to "gjy", 'j' to "hku", 'k' to "jli",
+            'l' to "ko", 'z' to "asx", 'x' to "zc", 'c' to "xv", 'v' to "cb", 'b' to "vn",
+            'n' to "bm", 'm' to "n",
+        )
+
+        /** Letters people most often leave out or add: vowels, h (dh/th/kh), v, y, r. */
+        private const val OFTEN_SKIPPED = "aeiouhvyr"
+
+        /** Every spelling one slip away: a letter missing, extra, swapped with its neighbour, or mistyped. */
+        internal fun oneTypoAway(word: String): Set<String> = buildSet {
+            for (i in word.indices) {
+                add(word.removeRange(i, i + 1))                                       // extra letter
+                if (i + 1 < word.length) add(word.substring(0, i) + word[i + 1] + word[i] + word.substring(i + 2))
+                for (c in NEIGHBOURS[word[i]].orEmpty()) add(word.substring(0, i) + c + word.substring(i + 1))
+            }
+            for (i in 0..word.length) for (c in OFTEN_SKIPPED) add(word.substring(0, i) + c + word.substring(i))
+            remove(word)
+        }
+
+        /**
+         * [looseKey], plus what Manglish typers skip: ്വ (dvandvam typed dvandam) and
+         * doubled letters (apprathyaksham for അപ്രത്യക്ഷം).
+         */
+        internal fun laxKey(word: String): String =
+            looseKey(word).replace("\u0D4D\u0D35", "").replace(doubled, "$1")
+
+        /** [looseKey] with doubled letters made single, but ്വ kept. */
+        private fun undoubledKey(word: String): String = looseKey(word).replace(doubled, "$1")
+
+        private val doubled = Regex("(\\p{L})\u0D4D\\1")
 
         fun looseKey(word: String): String {
             var w = word
