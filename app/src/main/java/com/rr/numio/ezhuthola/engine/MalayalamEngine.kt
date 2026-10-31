@@ -234,6 +234,12 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
                             (segments[index + 1] as? Seg.Consonant)?.base?.startsWith("യ") == false ->
                             append(rules.chilluByLetter.getValue(seg.base))
 
+                        // A dead m before r, s, sh, h or v is written ം: samrakshanam → സംരക്ഷണം,
+                        // samsaram → സംസാരം. Before p, b, m, y it stays joined (സമ്പത്ത്, സാമ്യം).
+                        !isLast && !seg.doubled && seg.base == rules.anuswaramLetter &&
+                            (segments[index + 1] as? Seg.Consonant)?.base?.take(1) in M_ANUSWARAM_BEFORE ->
+                            append(rules.anuswaram)
+
                         // Dead consonant in the middle: joins the next consonant.
                         !isLast -> {
                             append(seg.base)
@@ -290,6 +296,7 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
 
     private companion object {
         val R_LETTERS = setOf("ര", "റ")
+        val M_ANUSWARAM_BEFORE = setOf("ര", "സ", "ശ", "ഷ", "ഹ", "വ")
     }
 
     private fun <T> List<T>.replaced(index: Int, item: T): List<T> =
