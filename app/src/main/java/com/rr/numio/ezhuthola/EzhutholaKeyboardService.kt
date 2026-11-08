@@ -840,8 +840,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         if (ic.getTextBeforeCursor(fixed.length + 1, 0)?.toString() != "$fixed ") return false
         ic.deleteSurroundingText(fixed.length + 1, 0)
         ic.commitText(typed, 1)
-        enUser?.learn(typed.lowercase()) // "machane" won't be "corrected" again
-        enMissing?.forget(typed.lowercase())
+        if (!noLearning) {
+            enUser?.learn(typed.lowercase()) // "machane" won't be "corrected" again
+            enMissing?.forget(typed.lowercase())
+        }
         return true
     }
 
@@ -1022,6 +1024,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     /** The copied text, or null for nothing / passwords / OTPs / history switched off. */
     private fun readClipboard(): String? {
         if (!prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true) || passwordField) return null
+        // Incognito fields (private browser tabs and the like): nothing is kept.
+        if (noLearning) return null
         val clip = try { clipboard.primaryClip } catch (e: Exception) { null } ?: return null
         // Password managers and OTP autofill mark their copies as sensitive (Android 13+).
         if (clip.description?.extras?.getBoolean("android.content.extra.IS_SENSITIVE") == true) return null
@@ -1029,7 +1033,15 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         val text = try {
             clip.getItemAt(0).coerceToText(this)?.toString()?.trim().orEmpty()
         } catch (e: Exception) { "" }
+        // Most SMS apps don't mark a copied code as sensitive, so a short run of digits counts as an OTP.
+        if (looksLikeOtp(text)) return null
         return text.ifEmpty { null }
+    }
+
+    /** 4 to 8 digits, maybe split by a space or dash: "482913", "482 913", "4829-13". */
+    private fun looksLikeOtp(text: String): Boolean {
+        val digits = text.count { it.isDigit() }
+        return digits in 4..8 && text.all { it.isDigit() || it == ' ' || it == '-' }
     }
 
     private fun pasteClip(text: String) {
@@ -1099,6 +1111,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      * A Malayalam chip → that spelling comes first next time.
      */
     private fun learn(chosen: String) {
+        if (noLearning) return // incognito field: remember nothing
         val typed = suggestions?.typed ?: return
         if (malayalam && chosen != typed) {
             mlUser?.learn(chosen)
