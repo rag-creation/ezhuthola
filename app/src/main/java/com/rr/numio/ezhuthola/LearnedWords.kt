@@ -8,12 +8,13 @@ import java.io.File
  * The English words the keyboard learns as you type, shared by the keyboard and the app screen.
  * All of it stays in Ezhuthola's private storage on the phone.
  *
- * - taught: words you told the keyboard to keep (never corrected, suggested first)
+ * - taught: words you told the keyboard to keep (never corrected, suggested first). This is
+ *   "Your dictionary" in settings, where you can add, change and delete them.
  * - used: known words you type, so the ones you use move up ("br" → bro)
  * - missing: words you typed that the keyboard didn't know, for you to add or dismiss in settings
  *
  * Only the keyboard writes these files. The app screen leaves requests in the preferences
- * (add this word, dismiss that one, clear the list) and the keyboard carries them out the next
+ * (add this word, remove that one, dismiss, clear the list) and the keyboard carries them out the next
  * time it opens or closes. That way the two never overwrite each other's changes, even when
  * the keyboard is open in the app's own "Try it" box.
  */
@@ -24,6 +25,9 @@ object LearnedWords {
 
     /** Words waiting to be added (tapped "Add" in settings). */
     const val TO_ADD = "missing_to_add"
+
+    /** Words waiting to be taken out of your dictionary (deleted or changed in settings). */
+    const val TO_REMOVE = "dictionary_to_remove"
 
     /** Words you dismissed from the missing list, so they aren't listed again. */
     const val IGNORED = "missing_ignored"
@@ -48,7 +52,35 @@ object LearnedWords {
     }
 
     /** Keep this word: it's never corrected and gets suggested. */
-    fun add(context: Context, word: String) = addTo(context, TO_ADD, word)
+    fun add(context: Context, word: String) {
+        val prefs = KeyboardSettings.prefs(context)
+        prefs.edit()
+            .putStringSet(TO_ADD, toAdd(context) + word)
+            .putStringSet(TO_REMOVE, toRemove(context) - word)
+            .apply()
+    }
+
+    /** Take this word out of your dictionary: it can be corrected again like any other word. */
+    fun remove(context: Context, word: String) {
+        val prefs = KeyboardSettings.prefs(context)
+        prefs.edit()
+            .putStringSet(TO_ADD, toAdd(context) - word)
+            .putStringSet(TO_REMOVE, toRemove(context) + word)
+            .apply()
+    }
+
+    /** Fix a word in your dictionary (e.g. a typo when you added it). */
+    fun change(context: Context, old: String, new: String) {
+        if (old == new) return
+        remove(context, old)
+        add(context, new)
+    }
+
+    /** "Your dictionary" as the app screen should show it: A–Z, requests applied. */
+    fun dictionary(context: Context): List<String> {
+        val removed = toRemove(context)
+        return (read(context, TAUGHT_FILE).words + toAdd(context)).filter { it !in removed }.sorted()
+    }
 
     /** Not a word you want: it leaves the list and won't be listed again. */
     fun dismiss(context: Context, word: String) = addTo(context, IGNORED, word)
@@ -61,6 +93,8 @@ object LearnedWords {
 
     fun ignored(context: Context): Set<String> = stringSet(context, IGNORED)
 
+    fun toRemove(context: Context): Set<String> = stringSet(context, TO_REMOVE)
+
     /**
      * Keyboard side: carry out what the app screen asked for, then forget the requests.
      * Returns the dismissed words so the keyboard won't list them again.
@@ -68,15 +102,17 @@ object LearnedWords {
     fun applyRequests(context: Context, taught: UserWords, missing: UserWords): Set<String> {
         val prefs = KeyboardSettings.prefs(context)
         val adds = toAdd(context)
+        val removes = toRemove(context)
         val ignored = ignored(context)
         if (prefs.getBoolean(CLEAR, false)) missing.clear()
         for (word in adds) {
             taught.learn(word)
             missing.forget(word)
         }
+        removes.forEach(taught::forget)
         ignored.forEach(missing::forget)
-        if (adds.isNotEmpty() || prefs.getBoolean(CLEAR, false)) {
-            prefs.edit().remove(TO_ADD).remove(CLEAR).apply()
+        if (adds.isNotEmpty() || removes.isNotEmpty() || prefs.getBoolean(CLEAR, false)) {
+            prefs.edit().remove(TO_ADD).remove(TO_REMOVE).remove(CLEAR).apply()
         }
         return ignored
     }

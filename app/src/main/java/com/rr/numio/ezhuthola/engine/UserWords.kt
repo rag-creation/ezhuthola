@@ -59,6 +59,19 @@ class UserWords(
 
         fun fromTsv(text: String, maxWords: Int = MAX_WORDS): UserWords = UserWords(parse(text), maxWords)
 
+        /**
+         * A word typed into "Your dictionary", the way it's stored: trimmed and lowercase.
+         * Null when it isn't one word (empty, has spaces, too long, or odd characters).
+         * Letters, digits, ' and - are fine, so "don't", "e-mail" and "4g" all work.
+         */
+        fun clean(input: String): String? {
+            val word = input.trim().lowercase()
+            if (word.isEmpty() || word.length > MAX_LENGTH) return null
+            if (!word.any(Char::isLetter)) return null
+            if (!word.all { it.isLetterOrDigit() || it == '\'' || it == '’' || it == '-' }) return null
+            return word
+        }
+
         private fun parse(text: String): HashMap<String, Int> {
             val map = HashMap<String, Int>()
             for (line in text.lineSequence()) {

@@ -60,4 +60,24 @@ class UserWordsTest {
         assertTrue(words.isEmpty())
         assertTrue(words.dirty)
     }
+
+    @Test fun dictionaryWordsAreCleanedUp() {
+        assertEquals("machane", UserWords.clean("  Machane "))
+        assertEquals("don't", UserWords.clean("don't"))
+        assertEquals("e-mail", UserWords.clean("e-mail"))
+        assertEquals("4g", UserWords.clean("4G"))
+        assertEquals(null, UserWords.clean(""))
+        assertEquals(null, UserWords.clean("two words"))
+        assertEquals(null, UserWords.clean("123"))
+        assertEquals(null, UserWords.clean("hi!"))
+        assertEquals(null, UserWords.clean("a".repeat(41)))
+    }
+
+    @Test fun deletedDictionaryWordIsGone() {
+        val words = UserWords()
+        words.learn("machane")
+        words.forget("machane")
+        assertFalse("machane" in words)
+        assertTrue(words.dirty)
+    }
 }

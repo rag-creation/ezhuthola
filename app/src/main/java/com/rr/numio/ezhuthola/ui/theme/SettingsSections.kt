@@ -20,7 +20,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -47,8 +51,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rr.numio.ezhuthola.engine.UserWords
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -197,7 +203,13 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
     // ---- MISSING WORDS ----
     Spacer(Modifier.height(10.dp))
     Label("MISSING WORDS")
-    MissingWordsCard(refreshKey)
+    var wordChanges by remember { mutableIntStateOf(0) }
+    MissingWordsCard(refreshKey, onAdded = { wordChanges++ })
+
+    // ---- YOUR DICTIONARY ----
+    Spacer(Modifier.height(10.dp))
+    Label("YOUR DICTIONARY")
+    DictionaryCard(refreshKey, wordChanges)
 
     // ---- KEYBOARD LOOK ----
     Spacer(Modifier.height(10.dp))
@@ -289,7 +301,7 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
  * Add keeps the word (suggested, never corrected); ✕ hides it for good.
  */
 @Composable
-private fun MissingWordsCard(refreshKey: Int) {
+private fun MissingWordsCard(refreshKey: Int, onAdded: () -> Unit) {
     val context = LocalContext.current
     var version by remember { mutableIntStateOf(0) }
     var showAll by remember { mutableStateOf(false) }
@@ -323,7 +335,7 @@ private fun MissingWordsCard(refreshKey: Int) {
                 MissingWordRow(
                     word = word,
                     count = count,
-                    onAdd = { LearnedWords.add(context, word); version++ },
+                    onAdd = { LearnedWords.add(context, word); version++; onAdded() },
                     onDismiss = { LearnedWords.dismiss(context, word); version++ }
                 )
             }
@@ -357,6 +369,178 @@ private fun MissingWordsCard(refreshKey: Int) {
 }
 
 private const val MISSING_SHOWN = 15
+
+/**
+ * "Your dictionary": your own words (issue #7). Add, change or delete them here; they show up
+ * in suggestions and are never autocorrected. Words you add from the missing list land here too.
+ * Like the missing list, this only leaves requests; the keyboard applies them (see LearnedWords).
+ */
+@Composable
+private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
+    val context = LocalContext.current
+    var version by remember { mutableIntStateOf(0) }
+    var showAll by remember { mutableStateOf(false) }
+    var input by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf<String?>(null) }   // the word being changed, if any
+    var error by remember { mutableStateOf<String?>(null) }
+    val words by produceState(emptyList<String>(), refreshKey, outsideChanges, version) {
+        value = withContext(Dispatchers.IO) { LearnedWords.dictionary(context) }
+    }
+
+    fun save() {
+        val word = UserWords.clean(input)
+        when {
+            word == null -> error = "Type one word, without spaces."
+            word in words && word != editing -> error = "\"$word\" is already in your dictionary."
+            else -> {
+                val old = editing
+                if (old != null) LearnedWords.change(context, old, word) else LearnedWords.add(context, word)
+                input = ""; editing = null; error = null; version++
+            }
+        }
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Card)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Text(
+            "Your own words: names, slang, Manglish you type in English. They show up as " +
+                    "suggestions and are never autocorrected. Only on your phone.",
+            color = TextDim,
+            fontSize = 13.sp,
+            lineHeight = 18.sp
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = input,
+                onValueChange = { input = it; error = null },
+                placeholder = { Text(if (editing != null) "Change \"$editing\"" else "Add a word", color = TextDim) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextMain,
+                    unfocusedTextColor = TextMain,
+                    focusedContainerColor = Card,
+                    unfocusedContainerColor = Card,
+                    focusedBorderColor = Accent,
+                    unfocusedBorderColor = CardBorder,
+                    cursorColor = Accent
+                )
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (editing != null) "Save" else "Add",
+                color = Accent,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AccentSoft)
+                    .clickable { save() }
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+        }
+        if (editing != null) {
+            Text(
+                "Cancel",
+                color = TextDim,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { editing = null; input = ""; error = null }
+                    .padding(vertical = 4.dp, horizontal = 4.dp)
+            )
+        }
+        error?.let {
+            Text(it, color = Color(0xFFFF8A80), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+        }
+        if (words.isEmpty()) {
+            Text(
+                "No words yet.",
+                color = TextDim,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 10.dp)
+            )
+        } else {
+            Spacer(Modifier.height(6.dp))
+            val shown = if (showAll) words else words.take(DICTIONARY_SHOWN)
+            shown.forEach { word ->
+                DictionaryRow(
+                    word = word,
+                    onEdit = { editing = word; input = word; error = null },
+                    onDelete = {
+                        LearnedWords.remove(context, word)
+                        if (editing == word) { editing = null; input = "" }
+                        version++
+                    }
+                )
+            }
+            if (words.size > DICTIONARY_SHOWN) {
+                Text(
+                    if (showAll) "Show fewer" else "Show all ${words.size}",
+                    color = Accent,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { showAll = !showAll }
+                        .padding(vertical = 8.dp, horizontal = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+private const val DICTIONARY_SHOWN = 15
+
+/** One word in your dictionary: tap the word to change it, × to delete it. */
+@Composable
+private fun DictionaryRow(word: String, onEdit: () -> Unit, onDelete: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            word,
+            color = TextMain,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(onClickLabel = "Change $word", onClick = onEdit)
+                .padding(vertical = 8.dp, horizontal = 4.dp)
+        )
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF242424))
+                .clickable(onClickLabel = "Delete $word", onClick = onDelete),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(Modifier.size(12.dp)) {
+                val stroke = 2.dp.toPx()
+                val ink = Color(0xFFC8C8C8)
+                drawLine(ink, Offset.Zero, Offset(size.width, size.height), stroke, StrokeCap.Round)
+                drawLine(ink, Offset(size.width, 0f), Offset(0f, size.height), stroke, StrokeCap.Round)
+            }
+        }
+    }
+}
 
 @Composable
 private fun MissingWordRow(word: String, count: Int, onAdd: () -> Unit, onDismiss: () -> Unit) {
