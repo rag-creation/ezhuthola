@@ -1142,7 +1142,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private fun applyWordRequests() {
         val taught = enUser ?: return
         val missing = enMissing ?: return
-        ignoredMissing = LearnedWords.applyRequests(this, taught, missing)
+        ignoredMissing = LearnedWords.applyRequests(this, taught, missing, mlUser)
         writeChangedWords() // so the list in the app screen is up to date
     }
 
@@ -1237,7 +1237,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
         /** The quick emoji row before you've used any emoji. */
         val DEFAULT_EMOJI = listOf("😂", "❤️", "🙏", "🥰", "🤣", "👍", "😭", "😍", "🔥", "😊", "🥲", "😁", "🤗", "😅", "💯", "🙌")
-        const val ML_USER_FILE = "user_words_ml.tsv"
+        const val ML_USER_FILE = LearnedWords.ML_FILE
         const val CLIPS_FILE = "pinned_clips.txt"
         const val RECENT_CLIPS_FILE = "recent_clips.txt"
         /** How long the "just copied" chip stays in the strip. */

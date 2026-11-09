@@ -8,6 +8,7 @@ import java.io.File
  * The English words the keyboard learns as you type, shared by the keyboard and the app screen.
  * All of it stays in Ezhuthola's private storage on the phone.
  *
+ * - Malayalam: words picked from Malayalam suggestions or added to the dictionary's Malayalam tab
  * - taught: words you told the keyboard to keep (never corrected, suggested first). This is
  *   "Your dictionary" in settings, where you can add, change and delete them.
  * - used: known words you type, so the ones you use move up ("br" → bro)
@@ -28,6 +29,11 @@ object LearnedWords {
 
     /** Words waiting to be taken out of your dictionary (deleted or changed in settings). */
     const val TO_REMOVE = "dictionary_to_remove"
+
+    /** Malayalam words: picked from suggestions or added in "Your dictionary" (Malayalam tab). */
+    const val ML_FILE = "user_words_ml.tsv"
+    const val ML_TO_ADD = "dictionary_ml_to_add"
+    const val ML_TO_REMOVE = "dictionary_ml_to_remove"
 
     /** Words you dismissed from the missing list, so they aren't listed again. */
     const val IGNORED = "missing_ignored"
@@ -52,35 +58,40 @@ object LearnedWords {
     }
 
     /** Keep this word: it's never corrected and gets suggested. */
-    fun add(context: Context, word: String) {
-        val prefs = KeyboardSettings.prefs(context)
-        prefs.edit()
-            .putStringSet(TO_ADD, toAdd(context) + word)
-            .putStringSet(TO_REMOVE, toRemove(context) - word)
+    fun add(context: Context, word: String, malayalam: Boolean = false) {
+        val (addKey, removeKey) = keys(malayalam)
+        KeyboardSettings.prefs(context).edit()
+            .putStringSet(addKey, stringSet(context, addKey) + word)
+            .putStringSet(removeKey, stringSet(context, removeKey) - word)
             .apply()
     }
 
     /** Take this word out of your dictionary: it can be corrected again like any other word. */
-    fun remove(context: Context, word: String) {
-        val prefs = KeyboardSettings.prefs(context)
-        prefs.edit()
-            .putStringSet(TO_ADD, toAdd(context) - word)
-            .putStringSet(TO_REMOVE, toRemove(context) + word)
+    fun remove(context: Context, word: String, malayalam: Boolean = false) {
+        val (addKey, removeKey) = keys(malayalam)
+        KeyboardSettings.prefs(context).edit()
+            .putStringSet(addKey, stringSet(context, addKey) - word)
+            .putStringSet(removeKey, stringSet(context, removeKey) + word)
             .apply()
     }
 
     /** Fix a word in your dictionary (e.g. a typo when you added it). */
-    fun change(context: Context, old: String, new: String) {
+    fun change(context: Context, old: String, new: String, malayalam: Boolean = false) {
         if (old == new) return
-        remove(context, old)
-        add(context, new)
+        remove(context, old, malayalam)
+        add(context, new, malayalam)
     }
 
     /** "Your dictionary" as the app screen should show it: A–Z, requests applied. */
-    fun dictionary(context: Context): List<String> {
-        val removed = toRemove(context)
-        return (read(context, TAUGHT_FILE).words + toAdd(context)).filter { it !in removed }.sorted()
+    fun dictionary(context: Context, malayalam: Boolean = false): List<String> {
+        val (addKey, removeKey) = keys(malayalam)
+        val removed = stringSet(context, removeKey)
+        val file = if (malayalam) ML_FILE else TAUGHT_FILE
+        return (read(context, file).words + stringSet(context, addKey)).filter { it !in removed }.sorted()
     }
+
+    private fun keys(malayalam: Boolean) =
+        if (malayalam) ML_TO_ADD to ML_TO_REMOVE else TO_ADD to TO_REMOVE
 
     /** Not a word you want: it leaves the list and won't be listed again. */
     fun dismiss(context: Context, word: String) = addTo(context, IGNORED, word)
@@ -99,7 +110,7 @@ object LearnedWords {
      * Keyboard side: carry out what the app screen asked for, then forget the requests.
      * Returns the dismissed words so the keyboard won't list them again.
      */
-    fun applyRequests(context: Context, taught: UserWords, missing: UserWords): Set<String> {
+    fun applyRequests(context: Context, taught: UserWords, missing: UserWords, malayalam: UserWords? = null): Set<String> {
         val prefs = KeyboardSettings.prefs(context)
         val adds = toAdd(context)
         val removes = toRemove(context)
@@ -110,6 +121,13 @@ object LearnedWords {
             missing.forget(word)
         }
         removes.forEach(taught::forget)
+        val mlAdds = stringSet(context, ML_TO_ADD)
+        val mlRemoves = stringSet(context, ML_TO_REMOVE)
+        if (malayalam != null && (mlAdds.isNotEmpty() || mlRemoves.isNotEmpty())) {
+            mlAdds.forEach(malayalam::learn)
+            mlRemoves.forEach(malayalam::forget)
+            prefs.edit().remove(ML_TO_ADD).remove(ML_TO_REMOVE).apply()
+        }
         ignored.forEach(missing::forget)
         if (adds.isNotEmpty() || removes.isNotEmpty() || prefs.getBoolean(CLEAR, false)) {
             prefs.edit().remove(TO_ADD).remove(TO_REMOVE).remove(CLEAR).apply()
