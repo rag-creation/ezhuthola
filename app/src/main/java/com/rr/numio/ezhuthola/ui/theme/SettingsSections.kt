@@ -150,7 +150,7 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
         ) {
             clipboard = it; prefs.edit().putBoolean(KeyboardSettings.CLIPBOARD_HISTORY, it).apply()
         }
-        // Keyboard height: 75%–125%. The keyboard follows the slider straight away
+        // Keyboard height: 50%–125%. The keyboard follows the slider straight away
         // (try it in the box at the top of this screen).
         Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Keyboard height", color = TextMain, fontSize = 16.sp, modifier = Modifier.weight(1f))
