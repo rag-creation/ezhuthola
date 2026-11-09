@@ -82,7 +82,8 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
     var vibrate by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.VIBRATE, true)) }
     var sound by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)) }
     var clipboard by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)) }
-    var emojiRow by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.EMOJI_ROW, true)) }
+    var emojiRow by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.EMOJI_ROW, false)) }
+    var numberRow by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.NUMBER_ROW, false)) }
     var fontStyles by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.FONT_STYLES, true)) }
     var keyHeight by remember {
         mutableFloatStateOf(
@@ -141,6 +142,13 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
             emojiRow
         ) {
             emojiRow = it; prefs.edit().putBoolean(KeyboardSettings.EMOJI_ROW, it).apply()
+        }
+        ToggleRow(
+            "Number row",
+            "1 to 0 in a row above the letters. Without it, hold the top letters for numbers.",
+            numberRow
+        ) {
+            numberRow = it; prefs.edit().putBoolean(KeyboardSettings.NUMBER_ROW, it).apply()
         }
         ToggleRow(
             "Font styles",

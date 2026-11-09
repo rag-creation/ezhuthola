@@ -187,7 +187,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var fontStyle by mutableStateOf<String?>(null)
 
     /** Quick emoji row: on/off, and the emojis in it (most recently used first). */
-    private var emojiRowOn by mutableStateOf(true)
+    private var emojiRowOn by mutableStateOf(false)
+    private var numberRowOn by mutableStateOf(false)
     private var fontStylesOn by mutableStateOf(true)
     private var recentEmoji by mutableStateOf(DEFAULT_EMOJI)
 
@@ -213,7 +214,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private val lookListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM ||
             key == KeyboardSettings.KEY_HEIGHT || key == KeyboardSettings.EMOJI_ROW ||
-            key == KeyboardSettings.FONT_STYLES
+            key == KeyboardSettings.NUMBER_ROW || key == KeyboardSettings.FONT_STYLES
         ) {
             mainHandler.post { applySettings() }
         }
@@ -338,6 +339,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     recentEmoji = recentEmoji,
                     onEmoji = ::typeEmoji,
                     onEmojiRow = ::setEmojiRow,
+                    numberRow = numberRowOn,
                     fontStylesOn = fontStylesOn
                 )
             }
@@ -864,7 +866,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             vibrate = prefs.getBoolean(KeyboardSettings.VIBRATE, true),
             sound = prefs.getBoolean(KeyboardSettings.KEY_SOUND, false)
         )
-        emojiRowOn = prefs.getBoolean(KeyboardSettings.EMOJI_ROW, true)
+        emojiRowOn = prefs.getBoolean(KeyboardSettings.EMOJI_ROW, false)
+        numberRowOn = prefs.getBoolean(KeyboardSettings.NUMBER_ROW, false)
         fontStylesOn = prefs.getBoolean(KeyboardSettings.FONT_STYLES, true)
         if (!fontStylesOn) fontStyle = null
         keyHeight = prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)

@@ -112,6 +112,8 @@ private val CursorStep = 12.dp         // slide on space: one character per step
 private val WordStep = 26.dp           // slide left from backspace: one word per step
 private val AltPopupHeight = 54.dp     // the accents row that opens above a held key
 private val EmojiRowHeight = 46.dp     // quick emoji row above the keys
+/** The optional 1–0 row: a bit shorter than a letter row, and follows the "Keyboard height" setting. */
+private val NumberRowHeight: Dp @Composable get() = RowHeight * 0.68f
 
 /** Extra height panels add so they match the keyboard when the quick emoji row is on. */
 private val LocalPanelExtra = staticCompositionLocalOf { 0.dp }
@@ -266,6 +268,7 @@ fun KeyboardLayout(
     recentEmoji: List<String> = emptyList(),
     onEmoji: (String) -> Unit = onText, // an emoji was picked: type it and remember it
     onEmojiRow: (Boolean) -> Unit = {}, // turn the quick emoji row on/off from the keyboard
+    numberRow: Boolean = false,         // "Number row" setting: 1–0 above the letters
     fontStylesOn: Boolean = true        // "Font styles" setting: show the styles button
 ) {
     CompositionLocalProvider(
@@ -309,6 +312,7 @@ fun KeyboardLayout(
                 recentEmoji = recentEmoji,
                 onEmoji = onEmoji,
                 onEmojiRow = onEmojiRow,
+                numberRow = numberRow,
                 fontStylesOn = fontStylesOn
             )
         }
@@ -355,6 +359,7 @@ private fun KeyboardContent(
     recentEmoji: List<String> = emptyList(),
     onEmoji: (String) -> Unit = onText,
     onEmojiRow: (Boolean) -> Unit = {},
+    numberRow: Boolean = false,
     fontStylesOn: Boolean = true
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
@@ -412,7 +417,8 @@ private fun KeyboardContent(
 
     CompositionLocalProvider(
         LocalAltPopup provides altPopup,
-        LocalPanelExtra provides if (emojiRow) EmojiRowHeight else 0.dp
+        // Panels (emoji, clipboard, stickers) grow by the extra rows, so the keyboard keeps its height.
+        LocalPanelExtra provides (if (emojiRow) EmojiRowHeight else 0.dp) + (if (numberRow) NumberRowHeight else 0.dp)
     ) {
     Box(
         Modifier
@@ -497,10 +503,24 @@ private fun KeyboardContent(
 
         if (emojiRow) QuickEmojiRow(recentEmoji, onEmoji, onHide = { onEmojiRow(false) })
 
+        // Number row on the letters page. The symbol pages already start with 1–0, so there
+        // the space is kept empty instead, and the keyboard doesn't jump when you tap ?123.
+        if (numberRow) {
+            if (!symbols) {
+                Row(Modifier.fillMaxWidth()) {
+                    numberHints.forEach { n ->
+                        Key(n, Modifier.weight(1f).height(NumberRowHeight), fontSize = 20) { onText(n) }
+                    }
+                }
+            } else {
+                Spacer(Modifier.height(NumberRowHeight))
+            }
+        }
+
         // Row 1: letters, hold for numbers
         Row(Modifier.fillMaxWidth()) {
             rows[0].forEachIndexed { i, k ->
-                val hint = if (symbols) null else numberHints[i]
+                val hint = if (symbols || numberRow) null else numberHints[i] // the row shows them already
                 Key(
                     label = label(k),
                     modifier = Modifier.weight(1f),
