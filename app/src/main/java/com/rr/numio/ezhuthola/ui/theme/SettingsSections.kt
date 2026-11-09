@@ -445,12 +445,11 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
         Spacer(Modifier.height(10.dp))
         Text(
             if (malayalam) {
-                "Malayalam words you use: names, family words, anything the keyboard gets wrong. " +
-                        "Type the word in Malayalam once; after that the Manglish brings it up first. " +
-                        "Words you pick from suggestions are listed here too. Only on your phone."
+                "Names and words the keyboard gets wrong. Add them once in Malayalam, " +
+                        "then just type the Manglish. Only on your phone."
             } else {
-                "Your own words: names, slang, Manglish you type in English. They show up as " +
-                        "suggestions and are never autocorrected. Only on your phone."
+                "Names, slang and Manglish you type in English. Never autocorrected. " +
+                        "Only on your phone."
             },
             color = TextDim,
             fontSize = 13.sp,
@@ -465,7 +464,7 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
                     Text(
                         when {
                             editing != null -> "Change \"$editing\""
-                            malayalam -> "Add a word, e.g. അമ്മച്ചി"
+                            malayalam -> "Add a Malayalam word"
                             else -> "Add a word"
                         },
                         color = TextDim
