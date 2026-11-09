@@ -380,7 +380,13 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
         val askedByUser = (flags and (InputMethod.SHOW_EXPLICIT or InputMethod.SHOW_FORCED)) != 0
         val info = currentInputEditorInfo
-        if (!askedByUser && (info == null || info.inputType == InputType.TYPE_NULL)) return false
+        if (!askedByUser && (info == null || info.inputType == InputType.TYPE_NULL)) {
+            // Not opening here (no text box). On newer Android the app may already have made
+            // room for the keyboard, so also report it hidden; otherwise the app keeps an empty,
+            // keyboard-sized space at the bottom until the keyboard opens and closes again.
+            mainHandler.post { requestHideSelf(0) }
+            return false
+        }
         return super.onShowInputRequested(flags, configChange)
     }
 
