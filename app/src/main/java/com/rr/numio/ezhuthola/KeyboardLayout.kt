@@ -94,11 +94,16 @@ import androidx.compose.ui.unit.IntOffset
 
 // ---- Sizes: change these to resize the whole keyboard ----
 private val BaseRowHeight = 88.dp      // touch height of one row (includes the gap) at 100%
-/** Row height after the "Keyboard height" setting (75%–125%). */
+/** Row height after the "Keyboard height" setting (50%–125%). */
 private val RowHeight: Dp @Composable get() = BaseRowHeight * LocalKeyHeight.current
 private val KeyGapH = 2.dp             // half of the gap between keys
 private val KeyGapV = 5.dp             // half of the gap between rows
 private const val KeyFontSize = 28
+/**
+ * Below 75% height the key letters shrink with the keys, so they still fit inside them
+ * (issue #6). At 75% and above the letters stay their normal size.
+ */
+private val KeyTextScale: Float @Composable get() = (LocalKeyHeight.current / 0.75f).coerceAtMost(1f)
 private const val LongPressMs = 350L   // hold a top-row key this long to type its number
 private const val RepeatStartMs = 400L // hold backspace this long before it repeats
 private const val RepeatEveryMs = 50L
@@ -758,7 +763,7 @@ private fun Key(
                 Text(
                     text = label,
                     color = textColor,
-                    fontSize = fontSize.sp,
+                    fontSize = (fontSize * KeyTextScale).sp,
                     fontWeight = FontWeight.Normal
                 )
             }

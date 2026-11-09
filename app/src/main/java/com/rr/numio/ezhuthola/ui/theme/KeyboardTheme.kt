@@ -133,12 +133,12 @@ object KeyboardSettings {
     const val KEY_SOUND = "key_sound"
     const val CLIPBOARD_HISTORY = "clipboard_history"
     const val MALAYALAM = "malayalam"
-    const val KEY_HEIGHT = "key_height"          // 0.75 … 1.25, 1 = normal
+    const val KEY_HEIGHT = "key_height"          // 0.5 … 1.25, 1 = normal
     const val EMOJI_ROW = "emoji_row"            // quick emoji row above the keys
     const val FONT_STYLES = "font_styles"        // font styles button in the top strip
     const val RECENT_EMOJI = "recent_emoji"      // emojis in that row, newest first, one per line
 
-    const val MIN_KEY_HEIGHT = 0.75f
+    const val MIN_KEY_HEIGHT = 0.5f
     const val MAX_KEY_HEIGHT = 1.25f
 
     private const val PHOTO_FILE = "keyboard_photo.jpg"
