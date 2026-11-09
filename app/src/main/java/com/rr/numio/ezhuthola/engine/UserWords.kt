@@ -14,6 +14,10 @@ class UserWords(
     var dirty = false
         private set
 
+    /** Goes up on every change, so lookups built from these words know when to rebuild. */
+    var version = 0
+        private set
+
     fun count(word: String): Int = counts[word] ?: 0
 
     operator fun contains(word: String) = word in counts
@@ -32,14 +36,15 @@ class UserWords(
         counts[word] = count(word) + 1
         if (counts.size > maxWords) forgetRarest()
         dirty = true
+        version++
     }
 
     fun forget(word: String) {
-        if (counts.remove(word) != null) dirty = true
+        if (counts.remove(word) != null) { dirty = true; version++ }
     }
 
     fun clear() {
-        if (counts.isNotEmpty()) dirty = true
+        if (counts.isNotEmpty()) { dirty = true; version++ }
         counts.clear()
     }
 
@@ -69,6 +74,18 @@ class UserWords(
             if (word.isEmpty() || word.length > MAX_LENGTH) return null
             if (!word.any(Char::isLetter)) return null
             if (!word.all { it.isLetterOrDigit() || it == '\'' || it == '’' || it == '-' }) return null
+            return word
+        }
+
+        /**
+         * A Malayalam word typed into "Your dictionary" (Malayalam tab), trimmed. Null unless it's
+         * one word in Malayalam letters (ZWJ/ZWNJ allowed, for old-style chillus and ligatures).
+         */
+        fun cleanMalayalam(input: String): String? {
+            val word = input.trim()
+            if (word.isEmpty() || word.length > MAX_LENGTH) return null
+            if (!word.all { it in '\u0D00'..'\u0D7F' || it == '\u200C' || it == '\u200D' }) return null
+            if (!word.any { it in '\u0D05'..'\u0D39' || it in '\u0D7A'..'\u0D7F' }) return null // a letter, not just signs
             return word
         }
 

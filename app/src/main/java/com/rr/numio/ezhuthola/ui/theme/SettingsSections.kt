@@ -391,18 +391,24 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
     var input by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<String?>(null) }   // the word being changed, if any
     var error by remember { mutableStateOf<String?>(null) }
-    val words by produceState(emptyList<String>(), refreshKey, outsideChanges, version) {
-        value = withContext(Dispatchers.IO) { LearnedWords.dictionary(context) }
+    var malayalam by remember { mutableStateOf(false) }   // which tab: English or മലയാളം
+    val words by produceState(emptyList<String>(), refreshKey, outsideChanges, version, malayalam) {
+        value = withContext(Dispatchers.IO) { LearnedWords.dictionary(context, malayalam) }
     }
 
     fun save() {
-        val word = UserWords.clean(input)
+        val word = if (malayalam) UserWords.cleanMalayalam(input) else UserWords.clean(input)
         when {
-            word == null -> error = "Type one word, without spaces."
+            word == null -> error = if (malayalam) {
+                "Type one word in Malayalam letters (switch the keyboard to Malayalam)."
+            } else {
+                "Type one word, without spaces."
+            }
             word in words && word != editing -> error = "\"$word\" is already in your dictionary."
             else -> {
                 val old = editing
-                if (old != null) LearnedWords.change(context, old, word) else LearnedWords.add(context, word)
+                if (old != null) LearnedWords.change(context, old, word, malayalam)
+                else LearnedWords.add(context, word, malayalam)
                 input = ""; editing = null; error = null; version++
             }
         }
@@ -415,9 +421,37 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
             .background(Card)
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF242424))
+                .padding(3.dp)
+        ) {
+            listOf(false to "English", true to "മലയാളം").forEach { (ml, name) ->
+                val on = malayalam == ml
+                Text(
+                    name,
+                    color = if (on) Accent else TextDim,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (on) AccentSoft else Color.Transparent)
+                        .clickable { malayalam = ml; editing = null; input = ""; error = null; showAll = false }
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         Text(
-            "Your own words: names, slang, Manglish you type in English. They show up as " +
-                    "suggestions and are never autocorrected. Only on your phone.",
+            if (malayalam) {
+                "Malayalam words you use: names, family words, anything the keyboard gets wrong. " +
+                        "Type the word in Malayalam once; after that the Manglish brings it up first. " +
+                        "Words you pick from suggestions are listed here too. Only on your phone."
+            } else {
+                "Your own words: names, slang, Manglish you type in English. They show up as " +
+                        "suggestions and are never autocorrected. Only on your phone."
+            },
             color = TextDim,
             fontSize = 13.sp,
             lineHeight = 18.sp
@@ -427,7 +461,16 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it; error = null },
-                placeholder = { Text(if (editing != null) "Change \"$editing\"" else "Add a word", color = TextDim) },
+                placeholder = {
+                    Text(
+                        when {
+                            editing != null -> "Change \"$editing\""
+                            malayalam -> "Add a word, e.g. അമ്മച്ചി"
+                            else -> "Add a word"
+                        },
+                        color = TextDim
+                    )
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { save() }),
@@ -487,7 +530,7 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
                     word = word,
                     onEdit = { editing = word; input = word; error = null },
                     onDelete = {
-                        LearnedWords.remove(context, word)
+                        LearnedWords.remove(context, word, malayalam)
                         if (editing == word) { editing = null; input = "" }
                         version++
                     }

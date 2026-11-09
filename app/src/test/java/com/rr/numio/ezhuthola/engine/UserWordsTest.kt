@@ -80,4 +80,23 @@ class UserWordsTest {
         assertFalse("machane" in words)
         assertTrue(words.dirty)
     }
+
+    @Test fun malayalamDictionaryWordsAreCleanedUp() {
+        assertEquals("അമ്മച്ചി", UserWords.cleanMalayalam(" അമ്മച്ചി "))
+        assertEquals(null, UserWords.cleanMalayalam("ammachi"))
+        assertEquals(null, UserWords.cleanMalayalam("അമ്മ ച്ചി"))
+        assertEquals(null, UserWords.cleanMalayalam("്"))
+        assertEquals(null, UserWords.cleanMalayalam(""))
+    }
+
+    @Test fun ownMalayalamWordComesFirstEvenIfTheListLacksIt() {
+        val user = UserWords()
+        val ml = MalayalamSuggester(MalayalamEngine(rules), mlFreq, userWords = user)
+        user.learn("കുഞ്ഞാട്ടൻ")
+        assertEquals("കുഞ്ഞാട്ടൻ", ml.suggest("kunjattan").best)
+        // Loose spellings find it too (long/short vowels, ട/ത).
+        assertTrue("കുഞ്ഞാട്ടൻ" in ml.suggest("kunjaattan").words)
+        user.forget("കുഞ്ഞാട്ടൻ")
+        assertTrue(user.version > 0)
+    }
 }

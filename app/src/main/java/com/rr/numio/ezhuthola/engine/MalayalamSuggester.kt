@@ -53,7 +53,9 @@ data class Suggestions(
  * 3. Everything is ranked by how common it is. Spellings nobody uses keep the engine's order.
  * 4. Words the list doesn't have are built from a real base word + ending ([SuffixSplitter]):
  *    "achanodu" → അച്ഛൻ + ോട് → അച്ഛനോട്.
- * 5. Words this person picked before ([userWords]) come first, most-picked first.
+ * 5. Words this person picked before or added to "Your dictionary" ([userWords]) come first,
+ *    most-picked first. Their own words are found even when the word list doesn't have them
+ *    (names, family words): "kunjattan" → കുഞ്ഞാട്ടൻ once it's in the dictionary.
  * 6. English words typed in Malayalam mode are written the Malayali way ([english]):
  *    "four" → ഫോർ, not പോർ. The English spelling comes first when the English word is clearly
  *    more common than the Malayalam reading; otherwise it's offered second ("mon" stays മോൻ).
@@ -71,6 +73,18 @@ class MalayalamSuggester(
             val list = getOrPut(looseKey(word)) { mutableListOf() }
             if (list.size < 4) list += word
         }
+    }
+
+    /** This person's own words by loose key; rebuilt only when they change. */
+    private var personal: Map<String, List<String>> = emptyMap()
+    private var personalVersion = -1
+
+    private fun personalIndex(): Map<String, List<String>> {
+        if (personalVersion != userWords.version) {
+            personal = userWords.words.groupBy(::looseKey)
+            personalVersion = userWords.version
+        }
+        return personal
     }
 
     /** Looser still ([laxKey]): only used when nothing real turned up. Built on first use. */
@@ -177,8 +191,10 @@ class MalayalamSuggester(
     private fun pool(typed: String): LinkedHashSet<String> {
         val engineWords = engine.transliterate(typed).candidates
         val pool = LinkedHashSet<String>(engineWords)
+        val personal = personalIndex()
         engineWords.asSequence().map(::looseKey).distinct().forEach { key ->
             looseIndex[key]?.let(pool::addAll)
+            personal[key]?.let(pool::addAll)
         }
         return pool
     }
