@@ -47,6 +47,7 @@ import com.rr.numio.ezhuthola.engine.FancyText
 import com.rr.numio.ezhuthola.engine.MalayalamEngine
 import com.rr.numio.ezhuthola.engine.MalayalamRules
 import com.rr.numio.ezhuthola.engine.MalayalamSuggester
+import com.rr.numio.ezhuthola.engine.Shortcuts
 import com.rr.numio.ezhuthola.engine.MissingWordFilter
 import com.rr.numio.ezhuthola.engine.Suggestions
 import com.rr.numio.ezhuthola.engine.TextSteps
@@ -219,7 +220,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM ||
             key == KeyboardSettings.KEY_HEIGHT || key == KeyboardSettings.EMOJI_ROW ||
             key == KeyboardSettings.NUMBER_ROW || key == KeyboardSettings.FONT_STYLES ||
-            key == KeyboardSettings.AUTO_CAPS
+            key == KeyboardSettings.AUTO_CAPS || key == KeyboardSettings.ML_SHORTCUTS
         ) {
             mainHandler.post { applySettings() }
         }
@@ -268,7 +269,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                 EnglishInMalayalam.fromTsv(it)
             }
             suggester = MalayalamSuggester(MalayalamEngine(rules), words, userWords = ml, english = englishInMl)
-                .also { it.warmUp() }
+                .also {
+                    it.shortcuts = readShortcuts()
+                    it.warmUp()
+                }
             // Ezhuthola's own chat words (bro, tbh, ngl) are merged into the subtitle list.
             // Manglish chat words (machane, kazhicho, vave) join them: never corrected, suggested.
             val enExtra = assets.open("en_extra_words.tsv").bufferedReader().use { it.readLines() } +
@@ -879,6 +883,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
 
     // ---- Settings -------------------------------------------------------------
 
+    /** "How you type it" from Your dictionary, ready for the suggester. */
+    private fun readShortcuts(): Map<String, List<String>> =
+        Shortcuts.byTyped(Shortcuts.parse(prefs.getStringSet(KeyboardSettings.ML_SHORTCUTS, null).orEmpty()))
+
     /** Picks up anything changed in the app screen: theme, photo, vibration, sound, clipboard. */
     private fun applySettings() {
         applyWordRequests()
@@ -891,6 +899,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         emojiRowOn = prefs.getBoolean(KeyboardSettings.EMOJI_ROW, false)
         numberRowOn = prefs.getBoolean(KeyboardSettings.NUMBER_ROW, false)
         autoCapsOn = prefs.getBoolean(KeyboardSettings.AUTO_CAPS, true)
+        suggester?.shortcuts = readShortcuts()
         fontStylesOn = prefs.getBoolean(KeyboardSettings.FONT_STYLES, true)
         if (!fontStylesOn) fontStyle = null
         keyHeight = prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)

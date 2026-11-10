@@ -1,6 +1,7 @@
 package com.rr.numio.ezhuthola
 
 import android.content.Context
+import com.rr.numio.ezhuthola.engine.Shortcuts
 import com.rr.numio.ezhuthola.engine.UserWords
 import java.io.File
 
@@ -88,6 +89,19 @@ object LearnedWords {
         val removed = stringSet(context, removeKey)
         val file = if (malayalam) ML_FILE else TAUGHT_FILE
         return (read(context, file).words + stringSet(context, addKey)).filter { it !in removed }.sorted()
+    }
+
+    /** "How you type it" for Malayalam words: word → Manglish. */
+    fun shortcuts(context: Context): Map<String, String> =
+        Shortcuts.parse(stringSet(context, KeyboardSettings.ML_SHORTCUTS))
+
+    /** Set or clear (null) how a Malayalam word is typed. The keyboard picks it up at once. */
+    fun setShortcut(context: Context, word: String, manglish: String?) {
+        val kept = shortcuts(context).filterKeys { it != word }.toMutableMap()
+        if (manglish != null) kept[word] = manglish
+        KeyboardSettings.prefs(context).edit()
+            .putStringSet(KeyboardSettings.ML_SHORTCUTS, kept.map { Shortcuts.line(it.key, it.value) }.toSet())
+            .apply()
     }
 
     private fun keys(malayalam: Boolean) =

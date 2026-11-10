@@ -137,6 +137,7 @@ object KeyboardSettings {
     const val EMOJI_ROW = "emoji_row"            // quick emoji row above the keys (off by default)
     const val NUMBER_ROW = "number_row"          // 1–0 row above the letters (off by default)
     const val AUTO_CAPS = "auto_caps"            // capital letter at the start and after . ! ? (on)
+    const val ML_SHORTCUTS = "ml_shortcuts"      // Your dictionary: "word<TAB>manglish" (see Shortcuts)
     const val FONT_STYLES = "font_styles"        // font styles button in the top strip
     const val RECENT_EMOJI = "recent_emoji"      // emojis in that row, newest first, one per line
 
