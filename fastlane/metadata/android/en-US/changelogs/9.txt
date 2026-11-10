@@ -1,7 +1,7 @@
-- Your dictionary: add, change and delete your own English and Malayalam words
-- Malayalam words can have how you type them (e.g. a chat spelling), so they come first
-- Keyboard height can go down to 50%
-- Optional number row above the letters
-- Quick emoji row is now off by default (turn it on in Settings)
-- Fixed an empty space left behind in some apps after closing the keyboard
+- Your dictionary: your own English and Malayalam words, with how you type them
+- Auto capitals at the start and after a full stop (English)
+- OTP and code boxes open on numbers
+- Keyboard height down to 50%
+- Optional number row; quick emoji row now off by default
+- Fixed an empty space left in some apps after closing the keyboard
 - More privacy: no cloud backup of your words, OTPs never kept, no learning in incognito
