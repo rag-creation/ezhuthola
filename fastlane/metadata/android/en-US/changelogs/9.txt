@@ -1,0 +1,7 @@
+- Your dictionary: your own English and Malayalam words, with how you type them
+- Auto capitals at the start and after a full stop (English)
+- OTP and code boxes open on numbers
+- Keyboard height down to 50%
+- Optional number row; quick emoji row now off by default
+- Fixed an empty space left in some apps after closing the keyboard
+- More privacy: no cloud backup of your words, OTPs never kept, no learning in incognito
