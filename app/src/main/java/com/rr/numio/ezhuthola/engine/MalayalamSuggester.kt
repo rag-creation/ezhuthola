@@ -75,6 +75,13 @@ class MalayalamSuggester(
         }
     }
 
+    /**
+     * "How you type it" from Your dictionary: Manglish → words (myre → മൈര്). Set by the keyboard
+     * whenever settings change. An exact match comes first; a word starting with what's typed
+     * (3+ letters) is offered second, so it shows up while still typing.
+     */
+    @Volatile var shortcuts: Map<String, List<String>> = emptyMap()
+
     /** This person's own words by loose key; rebuilt only when they change. */
     private var personal: Map<String, List<String>> = emptyMap()
     private var personalVersion = -1
@@ -184,7 +191,20 @@ class MalayalamSuggester(
             ranked = (if (englishFirst) listOf(spelled) + others else listOf(best!!, spelled) + others.drop(1))
                 .take(maxShown)
         }
+        ranked = withShortcuts(typed.lowercase(), ranked)
         return Suggestions(typed = typed, best = ranked.first(), words = ranked)
+    }
+
+    private fun withShortcuts(typed: String, ranked: List<String>): List<String> {
+        val all = shortcuts
+        if (all.isEmpty()) return ranked
+        val exact = all[typed].orEmpty()
+        if (exact.isNotEmpty()) return (exact + ranked).distinct().take(maxShown)
+        if (typed.length < 3) return ranked
+        val started = all.entries.filter { it.key.startsWith(typed) }.sortedBy { it.key.length }
+            .flatMap { it.value }
+        if (started.isEmpty()) return ranked
+        return (ranked.take(1) + started + ranked.drop(1)).distinct().take(maxShown)
     }
 
     /** What the engine reads [typed] as, plus real words that differ only in loose letters. */
