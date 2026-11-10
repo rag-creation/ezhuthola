@@ -84,6 +84,7 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
     var clipboard by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.CLIPBOARD_HISTORY, true)) }
     var emojiRow by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.EMOJI_ROW, false)) }
     var numberRow by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.NUMBER_ROW, false)) }
+    var autoCaps by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.AUTO_CAPS, true)) }
     var fontStyles by remember { mutableStateOf(prefs.getBoolean(KeyboardSettings.FONT_STYLES, true)) }
     var keyHeight by remember {
         mutableFloatStateOf(
@@ -142,6 +143,13 @@ fun KeyboardSettingsSections(refreshKey: Int = 0) {
             emojiRow
         ) {
             emojiRow = it; prefs.edit().putBoolean(KeyboardSettings.EMOJI_ROW, it).apply()
+        }
+        ToggleRow(
+            "Auto capitals",
+            "Capital letter at the start and after a full stop, in English.",
+            autoCaps
+        ) {
+            autoCaps = it; prefs.edit().putBoolean(KeyboardSettings.AUTO_CAPS, it).apply()
         }
         ToggleRow(
             "Number row",

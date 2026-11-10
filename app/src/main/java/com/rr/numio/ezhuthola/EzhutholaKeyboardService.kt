@@ -84,6 +84,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private var session by mutableIntStateOf(0)
     private var startWithNumbers by mutableStateOf(false)
 
+    /** English mode: the next letter should be a capital (start of a sentence). */
+    private var autoShift by mutableStateOf(false)
+    private var autoCapsOn = true
+
     /** Manglish letters of the word being typed, e.g. "paran". Empty = not composing. */
     private val word = StringBuilder()
 
@@ -214,7 +218,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private val lookListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == KeyboardSettings.THEME || key == KeyboardSettings.PHOTO_DIM ||
             key == KeyboardSettings.KEY_HEIGHT || key == KeyboardSettings.EMOJI_ROW ||
-            key == KeyboardSettings.NUMBER_ROW || key == KeyboardSettings.FONT_STYLES
+            key == KeyboardSettings.NUMBER_ROW || key == KeyboardSettings.FONT_STYLES ||
+            key == KeyboardSettings.AUTO_CAPS
         ) {
             mainHandler.post { applySettings() }
         }
@@ -340,7 +345,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
                     onEmoji = ::typeEmoji,
                     onEmojiRow = ::setEmojiRow,
                     numberRow = numberRowOn,
-                    fontStylesOn = fontStylesOn
+                    fontStylesOn = fontStylesOn,
+                    autoShift = autoShift
                 )
             }
         }
@@ -415,6 +421,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         mainHandler.removeCallbacks(showWordAtCursor)
         tapped = null
         resetWord()
+        updateAutoShift()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -465,6 +472,20 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         mainHandler.removeCallbacks(showWordAtCursor)
         if (word.isEmpty() && newSelStart == newSelEnd) mainHandler.postDelayed(showWordAtCursor, 150)
         else forgetTapped()
+        updateAutoShift()
+    }
+
+    /**
+     * Capital letter at the start of the text and after ". ", "! ", "? " — only where the app
+     * asks for it (most chat and note fields do) and only in English mode: Manglish uses
+     * capitals for other letters (N → ണ, L → ള).
+     */
+    private fun updateAutoShift() {
+        val info = currentInputEditorInfo
+        val ic = currentInputConnection
+        autoShift = autoCapsOn && !malayalam && !plainField && info != null && ic != null &&
+                word.isEmpty() && selStart == selEnd &&
+                ic.getCursorCapsMode(info.inputType) != 0
     }
 
     private fun endsWithWord(before: CharSequence?, w: String): Boolean {
@@ -523,6 +544,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         forgetTapped() // the strip's English suggestions don't belong to the new mode
         malayalam = !malayalam
         prefs.edit().putBoolean(KeyboardSettings.MALAYALAM, malayalam).apply()
+        updateAutoShift()
         if (plainField) return
         if (word.isNotEmpty()) refreshWord()
         else if (malayalam) convertWordAtCursor()
@@ -868,6 +890,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         )
         emojiRowOn = prefs.getBoolean(KeyboardSettings.EMOJI_ROW, false)
         numberRowOn = prefs.getBoolean(KeyboardSettings.NUMBER_ROW, false)
+        autoCapsOn = prefs.getBoolean(KeyboardSettings.AUTO_CAPS, true)
         fontStylesOn = prefs.getBoolean(KeyboardSettings.FONT_STYLES, true)
         if (!fontStylesOn) fontStyle = null
         keyHeight = prefs.getFloat(KeyboardSettings.KEY_HEIGHT, 1f)
@@ -1209,12 +1232,19 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         }
     }
 
-    /** Number, phone, date and time fields open on the ?123 page. */
+    /**
+     * Number, phone, date and time fields open on the ?123 page. So do code boxes that are
+     * plain text fields but labelled as one (OTP, verification code, PIN): many apps do that.
+     */
     private fun isNumberField(info: EditorInfo): Boolean =
         when (info.inputType and InputType.TYPE_MASK_CLASS) {
             InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_PHONE, InputType.TYPE_CLASS_DATETIME -> true
+            InputType.TYPE_CLASS_TEXT -> looksLikeCodeField(info.hintText, info.fieldName)
             else -> false
         }
+
+    private fun looksLikeCodeField(vararg labels: CharSequence?): Boolean =
+        labels.any { it != null && CODE_FIELD.containsMatchIn(it) }
 
     /** Height of the navigation bar Android draws over keyboards (Android 15 and newer). */
     @SuppressLint("DiscouragedApi", "InternalInsetResource")
@@ -1238,6 +1268,12 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         /** The quick emoji row before you've used any emoji. */
         val DEFAULT_EMOJI = listOf("😂", "❤️", "🙏", "🥰", "🤣", "👍", "😭", "😍", "🔥", "😊", "🥲", "😁", "🤗", "😅", "💯", "🙌")
         const val ML_USER_FILE = LearnedWords.ML_FILE
+
+        /** Labels of one-time-code boxes: OTP, one-time password, verification code, PIN… */
+        private val CODE_FIELD = Regex(
+            "(?i)(\\botp\\b|one[- ]?time|verification code|security code|confirmation code|" +
+                    "sms code|passcode|\\bpin\\b|enter (the )?code)"
+        )
         const val CLIPS_FILE = "pinned_clips.txt"
         const val RECENT_CLIPS_FILE = "recent_clips.txt"
         /** How long the "just copied" chip stays in the strip. */

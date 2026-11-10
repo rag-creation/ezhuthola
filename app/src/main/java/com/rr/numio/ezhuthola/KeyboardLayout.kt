@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -269,7 +270,8 @@ fun KeyboardLayout(
     onEmoji: (String) -> Unit = onText, // an emoji was picked: type it and remember it
     onEmojiRow: (Boolean) -> Unit = {}, // turn the quick emoji row on/off from the keyboard
     numberRow: Boolean = false,         // "Number row" setting: 1–0 above the letters
-    fontStylesOn: Boolean = true        // "Font styles" setting: show the styles button
+    fontStylesOn: Boolean = true,       // "Font styles" setting: show the styles button
+    autoShift: Boolean = false          // English: next letter is a capital (start of a sentence)
 ) {
     CompositionLocalProvider(
         LocalKeyboardTheme provides theme,
@@ -313,7 +315,8 @@ fun KeyboardLayout(
                 onEmoji = onEmoji,
                 onEmojiRow = onEmojiRow,
                 numberRow = numberRow,
-                fontStylesOn = fontStylesOn
+                fontStylesOn = fontStylesOn,
+                autoShift = autoShift
             )
         }
     }
@@ -360,7 +363,8 @@ private fun KeyboardContent(
     onEmoji: (String) -> Unit = onText,
     onEmojiRow: (Boolean) -> Unit = {},
     numberRow: Boolean = false,
-    fontStylesOn: Boolean = true
+    fontStylesOn: Boolean = true,
+    autoShift: Boolean = false
 ) {
     // Keyed on `session`, so every new text field starts fresh instead of
     // keeping the page (?123, emoji, shift) that was open last time.
@@ -372,6 +376,18 @@ private fun KeyboardContent(
     var clipboardOpen by remember(session) { mutableStateOf(false) }
     var stickersOpen by remember(session) { mutableStateOf(false) }
     var stylesOpen by remember(session) { mutableStateOf(false) }   // font styles strip
+
+    // Auto capitals: shift turns on by itself at the start of a sentence, and back off when the
+    // keyboard says it's no longer needed — unless you changed shift yourself in between.
+    var autoShifted by remember(session) { mutableStateOf(false) }
+    LaunchedEffect(autoShift, session) {
+        if (autoShift) {
+            if (shift == Shift.OFF) { shift = Shift.ONCE; autoShifted = true }
+        } else {
+            if (autoShifted && shift == Shift.ONCE) shift = Shift.OFF
+            autoShifted = false
+        }
+    }
 
     fun label(key: String) = if (!symbols && shift != Shift.OFF) key.uppercase() else key
 
