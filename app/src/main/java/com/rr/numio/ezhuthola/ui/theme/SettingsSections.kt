@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rr.numio.ezhuthola.engine.Shortcuts
 import com.rr.numio.ezhuthola.engine.UserWords
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -392,24 +393,35 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
     var editing by remember { mutableStateOf<String?>(null) }   // the word being changed, if any
     var error by remember { mutableStateOf<String?>(null) }
     var malayalam by remember { mutableStateOf(false) }   // which tab: English or മലയാളം
+    var typedAs by remember { mutableStateOf("") }        // Malayalam tab: how you type it (Manglish)
     val words by produceState(emptyList<String>(), refreshKey, outsideChanges, version, malayalam) {
         value = withContext(Dispatchers.IO) { LearnedWords.dictionary(context, malayalam) }
     }
+    val shortcuts = remember(version) { LearnedWords.shortcuts(context) }
 
     fun save() {
         val word = if (malayalam) UserWords.cleanMalayalam(input) else UserWords.clean(input)
+        val manglish = if (malayalam && typedAs.isNotBlank()) Shortcuts.clean(typedAs) else null
         when {
+            malayalam && typedAs.isNotBlank() && manglish == null ->
+                error = "How you type it: English letters only, no spaces."
             word == null -> error = if (malayalam) {
                 "Type one word in Malayalam letters (switch the keyboard to Malayalam)."
             } else {
                 "Type one word, without spaces."
             }
-            word in words && word != editing -> error = "\"$word\" is already in your dictionary."
+            // Already there: fine when you're giving it a "how you type it".
+            word in words && word != editing && manglish == null ->
+                error = "\"$word\" is already in your dictionary."
             else -> {
                 val old = editing
                 if (old != null) LearnedWords.change(context, old, word, malayalam)
                 else LearnedWords.add(context, word, malayalam)
-                input = ""; editing = null; error = null; version++
+                if (malayalam) {
+                    if (old != null && old != word) LearnedWords.setShortcut(context, old, null)
+                    LearnedWords.setShortcut(context, word, manglish)
+                }
+                input = ""; typedAs = ""; editing = null; error = null; version++
             }
         }
     }
@@ -437,7 +449,7 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (on) AccentSoft else Color.Transparent)
-                        .clickable { malayalam = ml; editing = null; input = ""; error = null; showAll = false }
+                        .clickable { malayalam = ml; editing = null; input = ""; typedAs = ""; error = null; showAll = false }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 )
             }
@@ -445,8 +457,8 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
         Spacer(Modifier.height(10.dp))
         Text(
             if (malayalam) {
-                "Names and words the keyboard gets wrong. Add them once in Malayalam, " +
-                        "then just type the Manglish. Only on your phone."
+                "Names and words the keyboard gets wrong. Add the word in Malayalam and how you " +
+                        "type it, and it comes first when you type that. Only on your phone."
             } else {
                 "Names, slang and Manglish you type in English. Never autocorrected. " +
                         "Only on your phone."
@@ -498,6 +510,28 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             )
         }
+        if (malayalam) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = typedAs,
+                onValueChange = { typedAs = it; error = null },
+                placeholder = { Text("How you type it (English letters)", color = TextDim) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextMain,
+                    unfocusedTextColor = TextMain,
+                    focusedContainerColor = Card,
+                    unfocusedContainerColor = Card,
+                    focusedBorderColor = Accent,
+                    unfocusedBorderColor = CardBorder,
+                    cursorColor = Accent
+                )
+            )
+        }
         if (editing != null) {
             Text(
                 "Cancel",
@@ -507,7 +541,7 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
                 modifier = Modifier
                     .padding(top = 6.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable { editing = null; input = ""; error = null }
+                    .clickable { editing = null; input = ""; typedAs = ""; error = null }
                     .padding(vertical = 4.dp, horizontal = 4.dp)
             )
         }
@@ -527,10 +561,12 @@ private fun DictionaryCard(refreshKey: Int, outsideChanges: Int) {
             shown.forEach { word ->
                 DictionaryRow(
                     word = word,
-                    onEdit = { editing = word; input = word; error = null },
+                    typedAs = if (malayalam) shortcuts[word] else null,
+                    onEdit = { editing = word; input = word; typedAs = shortcuts[word].orEmpty(); error = null },
                     onDelete = {
                         LearnedWords.remove(context, word, malayalam)
-                        if (editing == word) { editing = null; input = "" }
+                        if (malayalam) LearnedWords.setShortcut(context, word, null)
+                        if (editing == word) { editing = null; input = ""; typedAs = "" }
                         version++
                     }
                 )
@@ -556,24 +592,23 @@ private const val DICTIONARY_SHOWN = 15
 
 /** One word in your dictionary: tap the word to change it, × to delete it. */
 @Composable
-private fun DictionaryRow(word: String, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun DictionaryRow(word: String, typedAs: String?, onEdit: () -> Unit, onDelete: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            word,
-            color = TextMain,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
+        Column(
+            Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(10.dp))
                 .clickable(onClickLabel = "Change $word", onClick = onEdit)
                 .padding(vertical = 8.dp, horizontal = 4.dp)
-        )
+        ) {
+            Text(word, color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            if (typedAs != null) Text(typedAs, color = TextDim, fontSize = 13.sp)
+        }
         Box(
             Modifier
                 .size(36.dp)

@@ -99,4 +99,15 @@ class UserWordsTest {
         user.forget("കുഞ്ഞാട്ടൻ")
         assertTrue(user.version > 0)
     }
+
+    @Test fun howYouTypeItBringsTheWordFirst() {
+        val ml = MalayalamSuggester(MalayalamEngine(rules), mlFreq, userWords = UserWords())
+        ml.shortcuts = mapOf("ammachy" to listOf("അമ്മച്ചി"))
+        // Exact: first, so space types it.
+        assertEquals("അമ്മച്ചി", ml.suggest("ammachy").best)
+        // Still typing: offered second.
+        assertTrue("അമ്മച്ചി" in ml.suggest("ammac").words.take(2))
+        // Too short to guess: left alone.
+        assertTrue("അമ്മച്ചി" !in ml.suggest("am").words)
+    }
 }
