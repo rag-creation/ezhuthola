@@ -76,7 +76,7 @@ class MalayalamSuggester(
     }
 
     /**
-     * "How you type it" from Your dictionary: Manglish → words (myre → മൈര്). Set by the keyboard
+     * "How you type it" from Your dictionary: Manglish → words (ammachy → അമ്മച്ചി). Set by the keyboard
      * whenever settings change. An exact match comes first; a word starting with what's typed
      * (3+ letters) is offered second, so it shows up while still typing.
      */

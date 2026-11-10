@@ -6,16 +6,16 @@ import kotlin.test.Test
 
 class ShortcutsTest {
     @Test fun manglishIsCleanedUp() {
-        assertEquals("myre", Shortcuts.clean(" Myre "))
+        assertEquals("ammachy", Shortcuts.clean(" Ammachy "))
         assertNull(Shortcuts.clean("my re"))
-        assertNull(Shortcuts.clean("മൈര്"))
+        assertNull(Shortcuts.clean("അമ്മച്ചി"))
         assertNull(Shortcuts.clean(""))
     }
 
     @Test fun linesRoundTrip() {
-        val lines = setOf(Shortcuts.line("മൈര്", "myre"), Shortcuts.line("പട്ടി", "patti"), "broken")
+        val lines = setOf(Shortcuts.line("അമ്മച്ചി", "ammachy"), Shortcuts.line("പൂച്ച", "poocha"), "broken")
         val parsed = Shortcuts.parse(lines)
-        assertEquals(mapOf("മൈര്" to "myre", "പട്ടി" to "patti"), parsed)
-        assertEquals(listOf("മൈര്"), Shortcuts.byTyped(parsed)["myre"])
+        assertEquals(mapOf("അമ്മച്ചി" to "ammachy", "പൂച്ച" to "poocha"), parsed)
+        assertEquals(listOf("അമ്മച്ചി"), Shortcuts.byTyped(parsed)["ammachy"])
     }
 }

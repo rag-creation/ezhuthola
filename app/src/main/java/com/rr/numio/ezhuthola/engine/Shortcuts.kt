@@ -1,9 +1,9 @@
 package com.rr.numio.ezhuthola.engine
 
 /**
- * "How you type it" for words in Your dictionary (Malayalam tab): myre → മൈര്.
+ * "How you type it" for words in Your dictionary (Malayalam tab): ammachy → അമ്മച്ചി.
  *
- * Some words are typed in a way the Manglish rules can't read (y for ai, chat spellings),
+ * Some words are typed in a way the Manglish rules can't read (y for i, chat spellings),
  * so loose matching never finds them. A shortcut ties the exact Manglish to the word.
  * Stored as "word<TAB>manglish" lines, one shortcut per word.
  */
