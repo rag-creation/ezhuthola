@@ -164,7 +164,7 @@ fun SetupScreen(
         OutlinedTextField(
             value = testText,
             onValueChange = { testText = it },
-            placeholder = { Text("Try typing \"njan\"…", color = TextDim) },
+            placeholder = { Text("Try typing \"ezhuthola\"…", color = TextDim) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
             colors = OutlinedTextFieldDefaults.colors(
