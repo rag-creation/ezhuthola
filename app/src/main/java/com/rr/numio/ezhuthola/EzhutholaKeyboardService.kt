@@ -95,6 +95,13 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     /** Last English correction, so backspace can undo it: (setting, setteng). */
     private var undo: Pair<String, String>? = null
 
+    /**
+     * Malayalam word that a number or symbol just ended: what it shows (ആന) and the Manglish
+     * behind it (aana). If that number is deleted and you keep typing letters, the word carries
+     * on from where it was instead of starting a new one ("aana5" ⌫ "kal" → ആനകൾ).
+     */
+    private var cutMalayalam: Pair<String, String>? = null
+
     /** What is underlined right now (the typed word, or its Malayalam spelling). */
     private var shown = ""
 
@@ -411,6 +418,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         selStart = info?.initialSelStart ?: -1
         selEnd = info?.initialSelEnd ?: -1
         deleteAnchor = -1
+        cutMalayalam = null
         slideCursor = -1
         noLearning = info != null &&
                 (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
@@ -526,7 +534,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      * checked and suggested as one. Not in the middle of a word, and not in Malayalam.
      */
     private fun resumeWordBeforeCursor() {
-        if (malayalam) return
+        if (malayalam) {
+            resumeMalayalamWord()
+            return
+        }
         val ic = currentInputConnection ?: return
         val after = ic.getTextAfterCursor(1, 0)?.toString().orEmpty()
         if (after.isNotEmpty() && isWordChar(after[0])) return
@@ -534,6 +545,26 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         if (left.isEmpty() || left.length >= MAX_WORD || !left.any { it.isAsciiLetter() }) return
         ic.deleteSurroundingText(left.length, 0)
         word.append(left)
+    }
+
+    /**
+     * The number or symbol that ended a Malayalam word was deleted and a letter follows:
+     * take the word back (as its Manglish) so typing carries on inside it.
+     * Only when the cursor sits right after that same word, with nothing glued on after it.
+     */
+    private fun resumeMalayalamWord() {
+        val (shownWord, manglish) = cutMalayalam ?: return
+        cutMalayalam = null
+        val ic = currentInputConnection ?: return
+        val after = ic.getTextAfterCursor(1, 0)?.toString().orEmpty()
+        if (after.isNotEmpty() && !after[0].isWhitespace()) return
+        val before = ic.getTextBeforeCursor(shownWord.length + 1, 0)?.toString().orEmpty()
+        if (!before.endsWith(shownWord)) return
+        // The character before the word must not be part of another word.
+        if (before.length > shownWord.length && !before[0].isWhitespace() &&
+            before[0].isLetterOrDigit()) return
+        ic.deleteSurroundingText(shownWord.length, 0)
+        word.append(manglish)
     }
 
     // ---- Keys --------------------------------------------------------------
@@ -544,6 +575,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      */
     private fun toggleLanguage() {
         undo = null
+        cutMalayalam = null
         mainHandler.removeCallbacks(showWordAtCursor)
         forgetTapped() // the strip's English suggestions don't belong to the new mode
         malayalam = !malayalam
@@ -586,6 +618,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             // A letter: add it to the word being typed (Manglish or English).
             !plainField && text.length == 1 && text[0].isAsciiLetter() -> {
                 if (word.isEmpty()) resumeWordBeforeCursor()
+                cutMalayalam = null
                 word.append(text)
                 refreshWord()
             }
@@ -597,11 +630,18 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             }
             // Space: commit the best word, then the space.
             text == " " -> {
+                cutMalayalam = null
                 commitWord()
                 commit(" ")
             }
             // Anything else (punctuation, numbers, emoji): finish the word first.
             else -> {
+                // Remember a Malayalam word cut short by a number or symbol, in case it was a slip.
+                cutMalayalam = if (malayalam && word.isNotEmpty() && shown.isNotEmpty()) {
+                    shown to word.toString()
+                } else {
+                    null
+                }
                 commitWord()
                 commit(text)
             }
