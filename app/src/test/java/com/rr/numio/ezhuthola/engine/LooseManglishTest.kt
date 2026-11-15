@@ -157,4 +157,12 @@ class LooseManglishTest {
         assertTrue("ahbc" in v)   // skipped h
         assertTrue("abc" !in v)
     }
+
+    @Test fun njCanBeNchMidWord() {
+        // "inji" is how people type ഇഞ്ചി (ginger); nj can stand for ഞ്ച too, not only ഞ്ഞ / ഞ്ജ.
+        assertEquals("ഇഞ്ചി", best("inji"))
+        // ...without breaking the usual ഞ്ഞ words.
+        assertEquals("മഞ്ഞ", best("manja"))
+        assertEquals("പറഞ്ഞു", best("paranju"))
+    }
 }
