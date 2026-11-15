@@ -102,6 +102,13 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      */
     private var cutMalayalam: Pair<String, String>? = null
 
+    /**
+     * The word typed straight after that number (aana5|kal): what it shows and its Manglish.
+     * If the number in between is deleted later, both halves join back into one word.
+     */
+    private var afterCut: Pair<String, String>? = null
+    private var wordAfterCut = false
+
     /** What is underlined right now (the typed word, or its Malayalam spelling). */
     private var shown = ""
 
@@ -419,6 +426,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         selEnd = info?.initialSelEnd ?: -1
         deleteAnchor = -1
         cutMalayalam = null
+        afterCut = null
         slideCursor = -1
         noLearning = info != null &&
                 (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
@@ -554,7 +562,6 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
      */
     private fun resumeMalayalamWord() {
         val (shownWord, manglish) = cutMalayalam ?: return
-        cutMalayalam = null
         val ic = currentInputConnection ?: return
         val after = ic.getTextAfterCursor(1, 0)?.toString().orEmpty()
         if (after.isNotEmpty() && !after[0].isWhitespace()) return
@@ -564,7 +571,45 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         if (before.length > shownWord.length && !before[0].isWhitespace() &&
             before[0].isLetterOrDigit()) return
         ic.deleteSurroundingText(shownWord.length, 0)
+        cutMalayalam = null
+        afterCut = null
         word.append(manglish)
+    }
+
+    /** The cursor sits right after "ആന5": the word being started follows the number that cut it. */
+    private fun startsRightAfterCut(): Boolean {
+        val (shownWord, _) = cutMalayalam ?: return false
+        if (!malayalam) return false
+        val before = currentInputConnection?.getTextBeforeCursor(shownWord.length + 1, 0)?.toString() ?: return false
+        return before.length == shownWord.length + 1 && before.startsWith(shownWord) && isCutChar(before.last())
+    }
+
+    private fun isCutChar(c: Char) = !c.isLetter() && !c.isWhitespace() && Character.getType(c) != Character.NON_SPACING_MARK.toInt()
+
+    /**
+     * Backspace on the number that split a Malayalam word in two ("എവി6|ദെയ"): delete it and
+     * join both halves back into one word, written from their Manglish together (evi + deya →
+     * എവിടെയാ), still being typed so the strip offers it. False if that isn't the case here.
+     */
+    private fun joinAcrossDeletedChar(): Boolean {
+        if (!malayalam || word.isNotEmpty()) return false
+        val (shownA, manglishA) = cutMalayalam ?: return false
+        val (shownB, manglishB) = afterCut ?: return false
+        val ic = currentInputConnection ?: return false
+        if (selStart != selEnd) return false
+        val before = ic.getTextBeforeCursor(shownA.length + 1, 0)?.toString().orEmpty()
+        val after = ic.getTextAfterCursor(shownB.length + 1, 0)?.toString().orEmpty()
+        if (before.length != shownA.length + 1 || !before.startsWith(shownA) || !isCutChar(before.last())) return false
+        if (!after.startsWith(shownB)) return false
+        if (after.length > shownB.length && after[shownB.length].isLetter()) return false
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(shownA.length + 1, shownB.length)
+        cutMalayalam = null
+        afterCut = null
+        word.append(manglishA).append(manglishB)
+        refreshWord()
+        ic.endBatchEdit()
+        return true
     }
 
     // ---- Keys --------------------------------------------------------------
@@ -576,6 +621,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     private fun toggleLanguage() {
         undo = null
         cutMalayalam = null
+        afterCut = null
         mainHandler.removeCallbacks(showWordAtCursor)
         forgetTapped() // the strip's English suggestions don't belong to the new mode
         malayalam = !malayalam
@@ -617,8 +663,10 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             }
             // A letter: add it to the word being typed (Manglish or English).
             !plainField && text.length == 1 && text[0].isAsciiLetter() -> {
-                if (word.isEmpty()) resumeWordBeforeCursor()
-                cutMalayalam = null
+                if (word.isEmpty()) {
+                    resumeWordBeforeCursor()
+                    if (word.isEmpty()) wordAfterCut = startsRightAfterCut()
+                }
                 word.append(text)
                 refreshWord()
             }
@@ -630,19 +678,19 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             }
             // Space: commit the best word, then the space.
             text == " " -> {
-                cutMalayalam = null
                 commitWord()
                 commit(" ")
             }
             // Anything else (punctuation, numbers, emoji): finish the word first.
             else -> {
                 // Remember a Malayalam word cut short by a number or symbol, in case it was a slip.
-                cutMalayalam = if (malayalam && word.isNotEmpty() && shown.isNotEmpty()) {
+                val cut = if (malayalam && word.isNotEmpty() && shown.isNotEmpty()) {
                     shown to word.toString()
                 } else {
                     null
                 }
                 commitWord()
+                if (cut != null) { cutMalayalam = cut; afterCut = null }
                 commit(text)
             }
         }
@@ -661,6 +709,7 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             }
             return
         }
+        if (joinAcrossDeletedChar()) return
         // A real key event handles selected text and emoji correctly.
         if (undoCorrection()) return
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
@@ -1238,6 +1287,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     }
 
     private fun resetWord() {
+        if (wordAfterCut && word.isNotEmpty() && shown.isNotEmpty()) afterCut = shown to word.toString()
+        wordAfterCut = false
         word.clear()
         shown = ""
         suggestions = null
