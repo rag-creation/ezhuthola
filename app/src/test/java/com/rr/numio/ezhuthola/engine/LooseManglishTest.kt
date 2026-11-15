@@ -165,4 +165,11 @@ class LooseManglishTest {
         assertEquals("മഞ്ഞ", best("manja"))
         assertEquals("പറഞ്ഞു", best("paranju"))
     }
+
+    @Test fun kollavarshamAndItsMonths() {
+        // sh is ശ by default; words people write with ഷ come from the word list.
+        assertEquals("കൊല്ലവർഷം", best("kollavarsham"))
+        assertEquals("ചിങ്ങം", best("chingam"))
+        assertEquals("വൃശ്ചികം", best("vrischikam"))
+    }
 }
