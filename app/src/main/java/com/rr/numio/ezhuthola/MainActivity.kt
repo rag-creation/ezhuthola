@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Canvas
@@ -39,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,15 +68,24 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SetupScreen(
-                refreshKey = refresh,
-                isEnabled = ::isKeyboardEnabled,
-                isSelected = ::isKeyboardSelected,
-                onEnable = { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) },
-                onSwitch = {
-                    getSystemService(InputMethodManager::class.java).showInputMethodPicker()
-                }
-            )
+            // Three pages: the main one, Words (your dictionary + missing words), About.
+            var page by rememberSaveable { mutableStateOf(Page.Home) }
+            BackHandler(enabled = page != Page.Home) { page = Page.Home }
+            when (page) {
+                Page.Home -> SetupScreen(
+                    refreshKey = refresh,
+                    isEnabled = ::isKeyboardEnabled,
+                    isSelected = ::isKeyboardSelected,
+                    onEnable = { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) },
+                    onSwitch = {
+                        getSystemService(InputMethodManager::class.java).showInputMethodPicker()
+                    },
+                    onOpenWords = { page = Page.Words },
+                    onOpenAbout = { page = Page.About }
+                )
+                Page.Words -> WordsScreen(refreshKey = refresh, onBack = { page = Page.Home })
+                Page.About -> AboutScreen(onBack = { page = Page.Home })
+            }
         }
     }
 
@@ -101,6 +112,8 @@ class MainActivity : ComponentActivity() {
             ?.startsWith("$packageName/") == true
 }
 
+private enum class Page { Home, Words, About }
+
 // ---- Numio palette ---------------------------------------------------------
 
 private val Bg = Color(0xFF0B0B0B)
@@ -119,7 +132,9 @@ fun SetupScreen(
     isEnabled: () -> Boolean,
     isSelected: () -> Boolean,
     onEnable: () -> Unit,
-    onSwitch: () -> Unit
+    onSwitch: () -> Unit,
+    onOpenWords: () -> Unit,
+    onOpenAbout: () -> Unit
 ) {
     val enabled = remember(refreshKey) { isEnabled() }
     val selected = remember(refreshKey) { isSelected() }
@@ -183,17 +198,10 @@ fun SetupScreen(
         )
 
         Spacer(Modifier.height(10.dp))
-        SectionLabel("STICKERS")
-        StickersCard()
+        // Typing, More (Words, Stickers, Clipboard), Keyboard look, Tips, About (SettingsSections.kt)
+        KeyboardSettingsSections(refreshKey, onOpenWords, onOpenAbout)
 
-        Spacer(Modifier.height(10.dp))
-        KeyboardSettingsSections(refreshKey)   // Typing, Missing words, Keyboard look (SettingsSections.kt)
-
-        Spacer(Modifier.height(10.dp))
-        SectionLabel("PRIVACY")
-        PrivacyCard()
-
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(14.dp))
         Footer()
     }
 }
@@ -231,34 +239,6 @@ private fun Header() {
         fontSize = 15.sp,
         lineHeight = 21.sp
     )
-}
-
-/** Make your own stickers from photos or Malayalam text. Opens the sticker maker. */
-@Composable
-private fun StickersCard() {
-    val context = LocalContext.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(Card)
-            .border(1.dp, CardBorder, RoundedCornerShape(22.dp))
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text("Make a sticker", color = TextMain, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "From a photo or Malayalam text. Send it from the sticker button in the keyboard.",
-                color = TextDim, fontSize = 13.sp, lineHeight = 18.sp
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Button(
-            onClick = { context.startActivity(Intent(context, StickerMakerActivity::class.java)) },
-            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.Black)
-        ) { Text("Make", fontWeight = FontWeight.Bold) }
-    }
 }
 
 @Composable
@@ -348,30 +328,7 @@ private fun AllSetCard() {
     }
 }
 
-@Composable
-private fun PrivacyCard() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(Card)
-            .padding(16.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        ShieldIcon(Accent)
-        Spacer(Modifier.width(14.dp))
-        Column {
-            Text("No internet permission", color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                "Everything you type stays on this phone. No ads, no tracking, and the code is open for anyone to check.",
-                color = TextDim,
-                fontSize = 13.sp,
-                lineHeight = 19.sp
-            )
-        }
-    }
-}
-
+/** The bottom of the main page: the privacy promise in one line, version, and who made it. */
 @Composable
 private fun Footer() {
     // The real version from build.gradle.kts, so it never goes stale
@@ -381,25 +338,85 @@ private fun Footer() {
             .getOrNull() ?: ""
     }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("v$version · Free & open source (GPL-3.0)", color = TextDim, fontSize = 12.sp)
-        Spacer(Modifier.height(4.dp))
-        Text("Made by a Keralite 💛", color = TextDim, fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ShieldIcon(Accent, small = true)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "No internet permission · nothing leaves your phone",
+                color = TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+            )
+        }
         Spacer(Modifier.height(10.dp))
-        Text(
-            "Word data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles\n" +
-                "English sounds: CMU Pronouncing Dictionary, Carnegie Mellon University (BSD)\n" +
-                "Spelling list: ESDB/SCOWL by Kevin Atkinson (MIT-like licence)\n" +
-                "Emoji names and keywords: Unicode CLDR and Unicode Emoji data " +
-                "© Unicode, Inc. (Unicode License v3)\n" +
-                "Sticker fonts: Baloo Chettan 2 by Ek Type; Manjari, Gayathri and Chilanka " +
-                "by Swathanthra Malayalam Computing (SIL Open Font License 1.1)\n" +
-                "Built with AndroidX and Jetpack Compose (Apache 2.0)\n" +
-                "Sticker tools (trace, magic wand, eraser, shapes) are Ezhuthola's own code",
-            color = TextDim.copy(alpha = 0.7f),
-            fontSize = 11.sp,
-            lineHeight = 15.sp,
-            textAlign = TextAlign.Center
-        )
+        Text("v$version · Free & open source (GPL-3.0)", color = TextDim, fontSize = 12.sp)
+        Spacer(Modifier.height(2.dp))
+        Text("Made by a Keralite 💛", color = TextDim, fontSize = 12.sp)
+    }
+}
+
+/** About and credits: the privacy promise, version, and every licence Ezhuthola uses. */
+@Composable
+fun AboutScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val version = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+            .getOrNull() ?: ""
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Bg)
+            .systemBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        PageTopBar("About and credits", onBack)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(Card)
+                .padding(16.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            ShieldIcon(Accent)
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text("No internet permission", color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Everything you type stays on this phone. No ads, no tracking, and the code is open for anyone to check.",
+                    color = TextDim,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
+                )
+            }
+        }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(Card)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Ezhuthola $version", color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text("Free & open source (GPL-3.0). Made by a Keralite 💛", color = TextDim, fontSize = 13.sp)
+            listOf(
+                "Word data" to "FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles",
+                "English sounds" to "CMU Pronouncing Dictionary, Carnegie Mellon University (BSD)",
+                "Spelling list" to "ESDB/SCOWL by Kevin Atkinson (MIT-like licence)",
+                "Emoji names and keywords" to "Unicode CLDR and Unicode Emoji data © Unicode, Inc. (Unicode License v3)",
+                "Sticker fonts" to "Baloo Chettan 2 by Ek Type; Manjari, Gayathri and Chilanka by Swathanthra Malayalam Computing (SIL Open Font License 1.1)",
+                "Built with" to "AndroidX and Jetpack Compose (Apache 2.0)",
+                "Sticker tools" to "Trace, magic wand, eraser and shapes are Ezhuthola's own code"
+            ).forEach { (title, text) ->
+                Column {
+                    Text(title, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(text, color = TextDim, fontSize = 13.sp, lineHeight = 18.sp)
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -422,8 +439,8 @@ private fun CheckMark(color: Color) {
 }
 
 @Composable
-private fun ShieldIcon(color: Color) {
-    Canvas(Modifier.size(28.dp)) {
+private fun ShieldIcon(color: Color, small: Boolean = false) {
+    Canvas(Modifier.size(if (small) 18.dp else 28.dp)) {
         val u = size.width / 24f
         val stroke = Stroke(width = 1.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
         drawPath(
