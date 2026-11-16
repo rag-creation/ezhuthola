@@ -27,7 +27,9 @@ class WordFrequencies(private val counts: LinkedHashMap<String, Int>) {
                 val tab = line.indexOf('\t')
                 if (tab <= 0) continue
                 val count = line.substring(tab + 1).trim().toIntOrNull() ?: continue
-                map[line.substring(0, tab)] = count
+                // A later list can switch a word off with 0: misspellings that slipped into
+                // the main list (അദ്ധേഹം for അദ്ദേഹം) are never suggested.
+                if (count <= 0) map.remove(line.substring(0, tab)) else map[line.substring(0, tab)] = count
             }
             return WordFrequencies(map)
         }
@@ -377,6 +379,7 @@ class MalayalamSuggester(
             "ഷ്ട്ട" to "ഷ്ട",                 // ishttam → ഇഷ്ടം
             "ന്ദ" to "ണ്ട",                   // nd: chandanam → ചന്ദനം, not only ണ്ട
             "ദ്ധ" to "ദ", "ധ്ധ" to "ദ",       // yudham → യുദ്ധം (dh is often ദ്ധ)
+            "ദ്ദ" to "ദ",                     // adeham / adheham → അദ്ദേഹം
             "ണ്ഡ" to "ണ്ട",                   // nd: markandeyan → മാർക്കണ്ഡേയൻ
             "ത്ഥ" to "ത",                     // artham → അർത്ഥം / അർഥം
             "ഞ്ജ" to "ഞ്ഞ",                   // anuranjanam → അനുരഞ്ജനം
