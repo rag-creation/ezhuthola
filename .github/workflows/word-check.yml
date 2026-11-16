@@ -3,8 +3,6 @@ name: Word check
 # Types the most-used Malayalam words into the engine and reports the ones that come out wrong.
 # Run it from the Actions tab ("Run workflow"); the report is attached to the run as word-report.
 on:
-  push:
-    branches: [word-check]
   workflow_dispatch:
     inputs:
       top:
