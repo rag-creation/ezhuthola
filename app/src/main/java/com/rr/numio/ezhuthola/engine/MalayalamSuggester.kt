@@ -198,6 +198,15 @@ class MalayalamSuggester(
             }
         }
 
+        // Once a real word is found, made-up spellings are just noise (ninachu → ണിനചു, നിനച്).
+        // Keep only real words, plus the letters as typed so a new name can still be picked.
+        fun isReal(word: String) = userWords.count(word) > 0 || frequencies.of(word) > 0 ||
+            built.containsKey(word) || score(word) > 0
+        if (ranked.any(::isReal)) {
+            val typedAsIs = engine.primary(typed)
+            ranked = ranked.filter { isReal(it) || it in spelled || it == typedAsIs }
+        }
+
         // Chat shortcuts: "aan" is almost always ആണ് (is), rarely ആൺ (male).
         val shortcut = chatShortcut(typed.lowercase())
         shortcut?.let { word ->

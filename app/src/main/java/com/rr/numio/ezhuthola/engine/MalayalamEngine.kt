@@ -143,9 +143,20 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
 
     /** Phones auto-capitalize the first letter. "Njan" means "njan" (ഞ), not "N"+"jan" (ണ). */
     private fun normalizeAutoCapital(s: String): String {
-        if (!s[0].isUpperCase()) return s
-        val looksAutoCapitalized = s.length == 1 || s[1].isLowerCase()
-        return if (looksAutoCapitalized) s[0].lowercaseChar() + s.substring(1) else s
+        val t = finalYAsI(s)
+        if (!t[0].isUpperCase()) return t
+        val looksAutoCapitalized = t.length == 1 || t[1].isLowerCase()
+        return if (looksAutoCapitalized) t[0].lowercaseChar() + t.substring(1) else t
+    }
+
+    /**
+     * A final "y" after a consonant is the English-style "i": mammootty → മമ്മൂട്ടി,
+     * ammachy → അമ്മച്ചി. Malayalam words don't end in ്യ്. After a vowel it stays: poy → പോയ്.
+     */
+    private fun finalYAsI(s: String): String {
+        if (s.length < 3 || s.last() != 'y') return s
+        val before = s[s.length - 2].lowercaseChar()
+        return if (before.isLetter() && before !in "aeiouy") s.dropLast(1) + "i" else s
     }
 
     // ---- Parsing ------------------------------------------------------------
@@ -244,7 +255,10 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
                         // Dead consonant in the middle: joins the next consonant.
                         !isLast -> {
                             append(seg.base)
-                            if (segments[index + 1] is Seg.Consonant) append(rules.virama) // prema → പ്രേമ
+                            // A chillu (from the swap below) never takes ്: മോഹൻലാൽ.
+                            if (segments[index + 1] is Seg.Consonant && seg.base !in CHILLUS) {
+                                append(rules.virama)                         // prema → പ്രേമ
+                            }
                         }
 
                         // Dead consonant at the end of the word.
@@ -275,6 +289,13 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
                         .filter { it != seg.base }
                         .forEach { alt -> variants += index to seg.copy(base = alt) }
 
+                    // A dead n, l, L before another consonant can be its chillu instead of joining
+                    // it: mohanlal → മോഹൻലാൽ, not മോഹന്ലാൽ. The word list decides.
+                    val chillu = rules.chilluByLetter[seg.base]
+                    if (chillu != null && seg.vowelKey == null && !seg.doubled &&
+                        segments.getOrNull(index + 1) is Seg.Consonant
+                    ) variants += index to seg.copy(base = chillu)
+
                     // Vowel swaps: e → E (െ → േ), o → O.
                     seg.vowelKey?.let { vk ->
                         rules.vowelAlternatives[vk].orEmpty().forEach { altKey ->
@@ -297,6 +318,7 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
 
     private companion object {
         val R_LETTERS = setOf("ര", "റ")
+        val CHILLUS = setOf("ൻ", "ൺ", "ർ", "ൽ", "ൾ", "ൿ")
         val M_ANUSWARAM_BEFORE = setOf("ര", "സ", "ശ", "ഷ", "ഹ", "വ")
     }
 
