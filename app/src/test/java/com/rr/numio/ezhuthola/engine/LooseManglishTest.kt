@@ -224,4 +224,11 @@ class LooseManglishTest {
         assertEquals("ഗോദാവരി", best("godavari"))
         assertEquals("കാവേരി", best("kaveri"))
     }
+
+    @Test fun festivalsAndActors() {
+        assertEquals("പൂരം", best("pooram"))
+        assertEquals("മകരവിളക്ക്", best("makaravilakku"))
+        assertEquals("മോഹൻലാൽ", best("mohanlal"))
+        assertEquals("മമ്മൂട്ടി", best("mammootty"))
+    }
 }
