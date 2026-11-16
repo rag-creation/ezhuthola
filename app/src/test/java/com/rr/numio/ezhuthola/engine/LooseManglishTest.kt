@@ -217,4 +217,18 @@ class LooseManglishTest {
     @Test fun sambandhamFirst() {
         assertEquals("സംബന്ധം", best("sambandham"))
     }
+
+    @Test fun filmsStatesRivers() {
+        assertEquals("നരസിംഹം", best("narasimham"))
+        assertEquals("പുലിമുരുകൻ", best("pulimurukan"))
+        assertEquals("ഗോദാവരി", best("godavari"))
+        assertEquals("കാവേരി", best("kaveri"))
+    }
+
+    @Test fun festivalsAndActors() {
+        assertEquals("പൂരം", best("pooram"))
+        assertEquals("മകരവിളക്ക്", best("makaravilakku"))
+        assertEquals("മോഹൻലാൽ", best("mohanlal"))
+        assertEquals("മമ്മൂട്ടി", best("mammootti"))
+    }
 }
