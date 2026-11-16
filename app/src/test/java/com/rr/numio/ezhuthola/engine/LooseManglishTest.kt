@@ -174,4 +174,36 @@ class LooseManglishTest {
         // dhanu: a look-alike starting with another letter (തന്, via the common തൻ) mustn't win.
         assertEquals("ധനു", best("dhanu"))
     }
+
+    // ---- Found by the word check (Nov 16, 2026) -----------------------------------
+
+    @Test fun doubledDIsOftenDdha() {
+        assertEquals("അദ്ദേഹം", best("addeham"))
+        assertEquals("ഉദ്ദേശം", best("uddesham"))
+    }
+
+    @Test fun mbhIsAnuswaramPlusBha() {
+        assertEquals("സംഭവം", best("sambhavam"))
+        assertEquals("ഗംഭീരം", best("gambheeram"))
+        assertTrue("സംബന്ധം" in strip("sambandham"))
+        assertEquals("അമ്പലം", best("ambalam"))   // mb is still മ്പ when that's the word
+    }
+
+    @Test fun mAtTheStartBeforeR() {
+        assertTrue("മൃഗം" in strip("mrugam"))
+        assertTrue(strip("mrugam").none { it.startsWith("ം") })
+    }
+
+    @Test fun zhStaysZh() {
+        assertEquals("അപ്പോഴും", best("appozhum"))
+        assertEquals("വീഴും", best("veezhum"))
+    }
+
+    @Test fun exactBaseBeatsLookAlikeBase() {
+        assertEquals("കുട്ടികളും", best("kuttikalum"))
+    }
+
+    @Test fun nkCanBeChilluPlusK() {
+        assertTrue("പെൺകുട്ടികൾ" in strip("penkuttikal"))
+    }
 }

@@ -236,7 +236,8 @@ class MalayalamEngine(private val rules: MalayalamRules, private val maxCandidat
 
                         // A dead m before r, s, sh, h or v is written ം: samrakshanam → സംരക്ഷണം,
                         // samsaram → സംസാരം. Before p, b, m, y it stays joined (സമ്പത്ത്, സാമ്യം).
-                        !isLast && !seg.doubled && seg.base == rules.anuswaramLetter &&
+                        // Never at the very start: mrugam is മൃഗം / മ്രുഗം, not ംരുഗം.
+                        index > 0 && !isLast && !seg.doubled && seg.base == rules.anuswaramLetter &&
                             (segments[index + 1] as? Seg.Consonant)?.base?.take(1) in M_ANUSWARAM_BEFORE ->
                             append(rules.anuswaram)
 

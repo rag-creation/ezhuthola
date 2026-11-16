@@ -109,7 +109,21 @@ class MalayalamSuggester(
         // The base may be an English word: cinema + kk → സിനിമ + യ്ക്ക്, phone + inte → ഫോൺ + ിന്റെ.
         val bases = pool(manglish).also { set -> english?.of(manglish)?.let { set += it.malayalam } }
         bases += laxMatches(manglish)   // markandeyante: മാർക്കണ്ഡേയൻ is only a lax match for "markandeyan"
-        bases.map { it to frequencies.of(it) }.filter { it.second > 0 }.sortedByDescending { it.second }
+        val scored = bases.map { it to frequencies.of(it) }.filter { it.second > 0 }
+        // Same rule as for whole words: a base spelled exactly comes before a look-alike unless
+        // that's 5× as common. kuttikalum is കുട്ടി + കളും before കൂടി + കളും. Look-alikes stay
+        // (അർത്ഥം for artham is a spelling, not a slip), just after.
+        // A look-alike with the same vowels is just another spelling (അർത്ഥം / അർഥം) and competes
+        // on how common it is; one with other vowels (കൂടി for kutti) is another word.
+        val exactBases = engine.transliterate(manglish).candidates.toHashSet()
+        val exactReal = scored.filter { it.first in exactBases }
+        val bestExact = exactReal.maxOfOrNull { it.second } ?: 0
+        val exactShapes = exactReal.mapTo(HashSet()) { vowelShape(it.first) }
+        val (first, rest) = scored.partition {
+            it.first in exactBases || bestExact == 0 || it.second >= bestExact * LOOSE_PENALTY ||
+                vowelShape(it.first) in exactShapes
+        }
+        first.sortedByDescending { it.second } + rest.sortedByDescending { it.second }
     })
 
     fun suggest(typed: String): Suggestions = suggest(typed, withEnglish = true)
@@ -147,8 +161,10 @@ class MalayalamSuggester(
         // dhanu is ധനു, not തന് (dh can be ദ ധ ഥ, never ത).
         val exactStarts = exact.mapNotNullTo(HashSet()) { it.firstOrNull() }
         fun penalty(word: String): Int = when {
-            !exactIsReal || word in exact || word in built -> 1
+            !exactIsReal || word in exact -> 1
             word.firstOrNull() !in exactStarts -> LOOSE_PENALTY * OTHER_START_PENALTY
+            // Built forms too: appozhum is അപ്പോഴും (a real word, typed right), not
+            // അപ്പോൾ + ും built from a look-alike base.
             else -> LOOSE_PENALTY
         }
         fun score(word: String): Int {
@@ -288,6 +304,10 @@ class MalayalamSuggester(
 
         /** How much more common a loose look-alike must be to beat the word the letters spell. */
         private const val LOOSE_PENALTY = 5
+
+        /** The vowels of a word, in order (letters and signs): കുട്ടി → ുി, അർത്ഥം → അ. */
+        private fun vowelShape(word: String): String =
+            word.filter { it in '\u0D05'..'\u0D14' || (it in '\u0D3E'..'\u0D4C') || it == '\u0D57' }
         /** Extra, on top of [LOOSE_PENALTY], for a look-alike that changes the first letter. */
         private const val OTHER_START_PENALTY = 10
 
