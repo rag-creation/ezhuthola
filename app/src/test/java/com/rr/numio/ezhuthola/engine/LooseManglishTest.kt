@@ -231,4 +231,26 @@ class LooseManglishTest {
         assertEquals("മോഹൻലാൽ", best("mohanlal"))
         assertEquals("മമ്മൂട്ടി", best("mammootti"))
     }
+
+    @Test fun finalYIsI() {
+        assertEquals("മമ്മൂട്ടി", best("mammootty"))
+        assertEquals("അമ്മച്ചി", primary("ammachy"))
+        assertEquals("പോയ്", primary("poy"))
+    }
+
+    @Test fun joinedNamesUseChillu() {
+        assertEquals("മോഹൻലാൽ", best("mohanlal"))
+        assertTrue("മോഹൻലാൽ" in engine.transliterate("mohanlal").candidates)
+    }
+
+    @Test fun singleChCanBeDoubled() {
+        assertEquals("നിനച്ചു", best("ninachu"))
+    }
+
+    @Test fun noMadeUpWordsOnceARealOneIsFound() {
+        val words = strip("ninachu")
+        assertTrue("ണിനചു" !in words, words.toString())
+        assertTrue("ണിനച്" !in words, words.toString())
+        assertEquals("നിനച്ചു", words.first())
+    }
 }
