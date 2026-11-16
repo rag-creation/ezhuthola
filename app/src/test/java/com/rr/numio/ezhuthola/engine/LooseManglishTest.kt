@@ -229,6 +229,6 @@ class LooseManglishTest {
         assertEquals("പൂരം", best("pooram"))
         assertEquals("മകരവിളക്ക്", best("makaravilakku"))
         assertEquals("മോഹൻലാൽ", best("mohanlal"))
-        assertEquals("മമ്മൂട്ടി", best("mammootty"))
+        assertEquals("മമ്മൂട്ടി", best("mammootti"))
     }
 }
