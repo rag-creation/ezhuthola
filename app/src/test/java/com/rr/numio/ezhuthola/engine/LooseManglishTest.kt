@@ -217,4 +217,11 @@ class LooseManglishTest {
     @Test fun sambandhamFirst() {
         assertEquals("സംബന്ധം", best("sambandham"))
     }
+
+    @Test fun filmsStatesRivers() {
+        assertEquals("നരസിംഹം", best("narasimham"))
+        assertEquals("പുലിമുരുകൻ", best("pulimurukan"))
+        assertEquals("ഗോദാവരി", best("godavari"))
+        assertEquals("കാവേരി", best("kaveri"))
+    }
 }
