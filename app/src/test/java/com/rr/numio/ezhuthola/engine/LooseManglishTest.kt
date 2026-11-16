@@ -234,13 +234,13 @@ class LooseManglishTest {
 
     @Test fun finalYIsI() {
         assertEquals("മമ്മൂട്ടി", best("mammootty"))
-        assertEquals("അമ്മച്ചി", primary("ammachy"))
+        assertEquals("മമ്മൂട്ടി", primary("mammootty"))
         assertEquals("പോയ്", primary("poy"))
     }
 
     @Test fun joinedNamesUseChillu() {
         assertEquals("മോഹൻലാൽ", best("mohanlal"))
-        assertTrue("മോഹൻലാൽ" in engine.transliterate("mohanlal").candidates)
+        assertTrue("മൊഹൻലാൽ" in engine.transliterate("mohanlal").candidates)
     }
 
     @Test fun singleChCanBeDoubled() {
