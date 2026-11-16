@@ -235,7 +235,7 @@ class LooseManglishTest {
     @Test fun finalYIsI() {
         assertEquals("മമ്മൂട്ടി", best("mammootty"))
         assertEquals("മമ്മൂട്ടി", primary("mammootty"))
-        assertEquals("പോയ്", primary("poy"))
+        assertEquals("പൊയ്", primary("poy"))
     }
 
     @Test fun joinedNamesUseChillu() {
