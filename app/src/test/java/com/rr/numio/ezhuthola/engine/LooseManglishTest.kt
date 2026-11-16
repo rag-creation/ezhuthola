@@ -206,4 +206,15 @@ class LooseManglishTest {
     @Test fun nkCanBeChilluPlusK() {
         assertTrue("പെൺകുട്ടികൾ" in strip("penkuttikal"))
     }
+
+    @Test fun addehamHowEverItsTyped() {
+        // അദ്ധേഹം is a misspelling in the main list, switched off in ml_extra_words.tsv.
+        for (typed in listOf("addeham", "adheham", "addheham", "adeham")) {
+            assertEquals("അദ്ദേഹം", best(typed), typed)
+        }
+    }
+
+    @Test fun sambandhamFirst() {
+        assertEquals("സംബന്ധം", best("sambandham"))
+    }
 }
