@@ -142,12 +142,23 @@ class MalayalamSuggester(
         // shouldn't override a word typed right.
         val exact = engine.transliterate(typed).candidates.toHashSet()
         val exactIsReal = exact.any { frequencies.of(it) > 0 }
+        // A look-alike that starts with a different letter than any spelling of what was typed
+        // is much less likely: people slip inside a word, rarely on its first letter.
+        // dhanu is ധനു, not തന് (dh can be ദ ധ ഥ, never ത).
+        val exactStarts = exact.mapNotNullTo(HashSet()) { it.firstOrNull() }
+        fun penalty(word: String): Int = when {
+            !exactIsReal || word in exact || word in built -> 1
+            word.firstOrNull() !in exactStarts -> LOOSE_PENALTY * OTHER_START_PENALTY
+            else -> LOOSE_PENALTY
+        }
         fun score(word: String): Int {
-            val own0 = maxOf(frequencies.of(word), built[word] ?: 0)
-            val own = if (exactIsReal && word !in exact && word !in built) own0 / LOOSE_PENALTY else own0
+            val pen = penalty(word)
+            val own = maxOf(frequencies.of(word), built[word] ?: 0) / pen
             if (!endsInU || !word.endsWith(VIRAMA) || word.length < 2) return own
             val chillu = CHILLU_OF[word[word.length - 2]] ?: return own
-            return maxOf(own, frequencies.of(word.dropLast(2) + chillu))
+            // The chillu form's count is lent with the same penalty: a loose look-alike
+            // mustn't jump ahead just because it ends in u (dhanu → തന് via തൻ).
+            return maxOf(own, frequencies.of(word.dropLast(2) + chillu) / pen)
         }
 
         // Sorting is stable: equally-common words keep the engine's order.
@@ -277,6 +288,8 @@ class MalayalamSuggester(
 
         /** How much more common a loose look-alike must be to beat the word the letters spell. */
         private const val LOOSE_PENALTY = 5
+        /** Extra, on top of [LOOSE_PENALTY], for a look-alike that changes the first letter. */
+        private const val OTHER_START_PENALTY = 10
 
         /** Manglish chat spellings that mean a different word than the letters say. */
         private val CHAT_SHORTCUTS = mapOf(
