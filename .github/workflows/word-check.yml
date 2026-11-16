@@ -26,7 +26,9 @@ jobs:
           WORD_REPORT_TOP: ${{ inputs.top || '5000' }}
         run: ./gradlew --no-daemon testDebugUnitTest --tests '*WordReportTest*'
       - name: Summary
-        run: cat app/build/word-report.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          cat app/build/word-report.md >> "$GITHUB_STEP_SUMMARY"
+          cat app/build/word-report.md
       - uses: actions/upload-artifact@v4
         with:
           name: word-report
