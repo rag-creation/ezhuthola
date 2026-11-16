@@ -171,5 +171,7 @@ class LooseManglishTest {
         assertEquals("കൊല്ലവർഷം", best("kollavarsham"))
         assertEquals("ചിങ്ങം", best("chingam"))
         assertEquals("വൃശ്ചികം", best("vrischikam"))
+        // dhanu: a look-alike starting with another letter (തന്, via the common തൻ) mustn't win.
+        assertEquals("ധനു", best("dhanu"))
     }
 }
