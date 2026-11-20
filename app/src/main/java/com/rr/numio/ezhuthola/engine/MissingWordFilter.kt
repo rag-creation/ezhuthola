@@ -14,6 +14,15 @@ object MissingWordFilter {
 
     private const val MIN_LENGTH = 3
 
+    /**
+     * Typed the same way this many times, a missing word is learned by itself: a typo is
+     * rarely made the same way three times, a real word is ("backspace", a friend's name).
+     */
+    const val LEARN_AFTER = 3
+
+    /** True once a missing word has been typed often enough to learn it. */
+    fun readyToLearn(timesTyped: Int): Boolean = timesTyped >= LEARN_AFTER
+
     /** Words that only ever show up as parts of links. */
     private val LINK_WORDS = setOf("http", "https", "www", "html", "htm", "php", "com", "org", "net")
 

@@ -936,7 +936,8 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
     /**
      * Learn from an English word that was just typed. A known word counts as used, so it moves
      * up in completions. An unknown one goes on the "Missing words" list in settings, unless
-     * it's Manglish (Malayalam mode handles that) or you dismissed it before.
+     * it's Manglish (Malayalam mode handles that) or you dismissed it before. Typed the same
+     * way three times, it is learned by itself and leaves the list.
      * Nothing is learned in incognito fields, and password fields never get here.
      */
     private fun noteEnglishWord(typed: String) {
@@ -949,7 +950,14 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
         } else if (!isManglish(lower) && lower !in ignoredMissing) {
             // Skip bits like "qr" and pieces of links ("https", "getnumio" in https://getnumio.org).
             val before = currentInputConnection?.getTextBeforeCursor(64, 0)?.toString() ?: lower
-            if (MissingWordFilter.worthNoting(lower, before)) enMissing?.learn(lower)
+            val missing = enMissing ?: return
+            if (MissingWordFilter.worthNoting(lower, before)) {
+                missing.learn(lower)
+                if (MissingWordFilter.readyToLearn(missing.count(lower))) {
+                    enUser?.learn(lower)
+                    missing.forget(lower)
+                }
+            }
         }
     }
 
