@@ -68,6 +68,9 @@ class EnglishSuggester(
         // word could be one slip from some rare English word.
         val auto = corrections.firstOrNull()?.takeIf { c ->
             if (c.fromKnown) return@takeIf false
+            // A spelling-list word just as close means we can't tell which was meant:
+            // "backspce" could be backside or backspace, so leave it for a tap.
+            if (corrections.any { it.fromKnown && it.cost <= c.cost }) return@takeIf false
             val closeEnough = if (lower.length >= 6) c.cost <= 2
             else c.cost <= 1 && sameLetters(lower, c.word) // short: swaps only
             // A rare word the list does know ("realy") is kept unless the fix is far more likely.
@@ -161,9 +164,9 @@ class EnglishSuggester(
             val cost = distance(typed, target, limit)
             if (cost <= limit && words[rank] != typed) found += Candidate(words[rank], cost, score(cost, rank))
         }
-        // Nothing close in the main list: try the spelling list for longer words
-        // ("backspce" → backspace). Ranked as the rarest words, so they never beat a listed one.
-        if (found.isEmpty() && typed.length >= KNOWN_FIX) {
+        // Longer words: the spelling list too ("backspce" → backspace). Ranked as the rarest
+        // words, so a listed word that is just as close still comes first.
+        if (typed.length >= KNOWN_FIX) {
             for (target in knownSorted) {
                 if (kotlin.math.abs(target.length - typed.length) > maxLenDiff) continue
                 val t0 = target[0]

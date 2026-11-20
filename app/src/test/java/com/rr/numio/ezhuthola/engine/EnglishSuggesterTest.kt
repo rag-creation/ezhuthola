@@ -183,8 +183,10 @@ class EnglishSuggesterTest {
     }
 
     @Test fun spellingListWordsAreOfferedAfterTheMainList() {
-        assertTrue("backspace" in withKnown.suggest("backs").words, withKnown.suggest("backs").words.toString())
-        assertTrue("screenshot" in withKnown.suggest("screens").words, withKnown.suggest("screens").words.toString())
+        // "backs" fills the strip with common words (backstage, backseat, backside);
+        // one more letter and the spelling list has room.
+        assertTrue("backspace" in withKnown.suggest("backsp").words, withKnown.suggest("backsp").words.toString())
+        assertTrue("screenshot" in withKnown.suggest("screensh").words, withKnown.suggest("screensh").words.toString())
         // Not from 3 letters: "fil" still offers common words only.
         assertTrue(withKnown.suggest("fil").words.none { it == "filch" })
         // Common words still come first.
