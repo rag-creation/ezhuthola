@@ -291,15 +291,16 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             // Manglish chat words (machane, kazhicho, vave) join them: never corrected, suggested.
             val enExtra = assets.open("en_extra_words.tsv").bufferedReader().use { it.readLines() } +
                 assets.open("en_manglish_words.tsv").bufferedReader().use { it.readLines() }
-            // Real but rare words: left as typed and kept off Missing words, never suggested.
-            // Quiet words (swear words like myre) are treated the same: typed fine, never offered.
-            val enKnown = assets.open("en_known_words.txt").bufferedReader().use { it.readLines() } +
-                assets.open("en_quiet_words.txt").bufferedReader().use { it.readLines() }
+            // The spelling list (backspace, screenshot): left as typed, kept off Missing words,
+            // offered after the main list. Quiet words (swear words like myre): typed fine, never offered.
+            val enKnown = assets.open("en_known_words.txt").bufferedReader().use { it.readLines() }
+            val enQuiet = assets.open("en_quiet_words.txt").bufferedReader().use { it.readLines() }
             english = assets.open("en_words.tsv").bufferedReader().useLines {
                 // Manglish like "poda" or "adipoli" is never "corrected" into English.
                 EnglishSuggester.fromTsv(
                     it, isManglish = ::isManglish, userWords = en,
-                    extra = enExtra.asSequence(), used = used, known = enKnown.asSequence()
+                    extra = enExtra.asSequence(), used = used, known = enKnown.asSequence(),
+                    quiet = enQuiet.asSequence(),
                 )
             }
             emojiSearch = loadEmojiSearch()

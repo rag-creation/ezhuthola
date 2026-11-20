@@ -7,8 +7,9 @@ package com.rr.numio.ezhuthola.engine
  * Words come from en_words.tsv ("word<TAB>count", most common first).
  * Data: FrequencyWords by Hermit Dave (CC BY-SA 4.0), based on OpenSubtitles.
  * Ezhuthola's own en_extra_words.tsv adds chat words the subtitles miss or bury (bro, tbh, ngl).
- * en_known_words.txt (from ESDB/SCOWL by Kevin Atkinson) is a quiet spelling list: correct but
- * rare words ("photosynthesis") are left alone and never go on Missing words, but are not suggested.
+ * en_known_words.txt (from ESDB/SCOWL by Kevin Atkinson) is the spelling list: correct words the
+ * subtitles miss ("backspace", "screenshot"). They are left alone, never go on Missing words, and
+ * are offered last: as completions once 4 letters are typed, and as fixes for longer typos.
  *
  * [Suggestions.best] is what space types: what you typed if it is a real word,
  * otherwise a correction when there is a close one. The typed chip keeps your own word
@@ -23,14 +24,19 @@ class EnglishSuggester(
     private val userWords: UserWords = UserWords(),
     /** Known words this person types, with how often: they move up in completions ("br" → bro). */
     private val used: UserWords = UserWords(),
-    /** Real but rare words: never suggested, only kept from being "corrected" or listed as missing. */
+    /** Real but rarer words: kept from being "corrected", offered after the main list's words. */
     private val known: Set<String> = emptySet(),
+    /** Fine to type but never offered (swear words like myre): left alone, never suggested. */
+    private val quiet: Set<String> = emptySet(),
     /** How names are written, by their plain lowercase form: "bbc" → BBC, "fdroid" → F-Droid. */
     private val display: Map<String, String> = emptyMap(),
 ) {
     private val rankOf = HashMap<String, Int>(words.size * 2).apply {
         words.forEachIndexed { i, w -> putIfAbsent(w, i) }
     }
+
+    /** The spelling list in a-z order, for prefix lookups ("backs" → backspace). */
+    private val knownSorted: Array<String> = (known - quiet).toTypedArray().also { it.sort() }
 
     /** Words without apostrophes, so "dont" finds don't and "im" finds I'm. */
     private val plain: Array<String> = Array(words.size) { words[it].replace("'", "") }
@@ -43,7 +49,8 @@ class EnglishSuggester(
 
     /** In the spelling list, or a possessive of a word that is ("photosynthesis's"). */
     private fun isKnown(lower: String): Boolean =
-        lower in known || (lower.endsWith("'s") && lower.dropLast(2).let { it in known || it in rankOf })
+        lower in known || lower in quiet ||
+            (lower.endsWith("'s") && lower.dropLast(2).let { it in known || it in rankOf })
 
     fun suggest(typed: String): Suggestions {
         if (typed.isEmpty()) return Suggestions("", "", emptyList())
@@ -57,7 +64,13 @@ class EnglishSuggester(
         // Manglish gets no English look-alikes in the strip ("visesham" never offers bisexual).
         val corrections = if (commonWord || lower.length < 3 || isManglish(lower)) emptyList()
         else corrections(lower)
+        // Spelling-list fixes are only offered, never typed by space: an unknown Manglish
+        // word could be one slip from some rare English word.
         val auto = corrections.firstOrNull()?.takeIf { c ->
+            if (c.fromKnown) return@takeIf false
+            // A spelling-list word just as close means we can't tell which was meant:
+            // "backspce" could be backside or backspace, so leave it for a tap.
+            if (corrections.any { it.fromKnown && it.cost <= c.cost }) return@takeIf false
             val closeEnough = if (lower.length >= 6) c.cost <= 2
             else c.cost <= 1 && sameLetters(lower, c.word) // short: swaps only
             // A rare word the list does know ("realy") is kept unless the fix is far more likely.
@@ -90,6 +103,13 @@ class EnglishSuggester(
                 .take(maxShown - completions.size)
                 .forEach { completions += it }
         }
+        // Still room: words from the spelling list, shortest first ("backs" → backspace).
+        if (completions.size < maxShown && lower.length >= KNOWN_PREFIX) {
+            knownStartingWith(lower)
+                .filter { it !in completions }
+                .take(maxShown - completions.size)
+                .forEach { completions += it }
+        }
 
         // Strip order: the auto-correction first, then completions, then other corrections.
         val shown = LinkedHashSet<String>()
@@ -112,7 +132,7 @@ class EnglishSuggester(
      * any other wrong / missing / extra letter = 2. [score]: lower is better; it mixes
      * how close the word is with how common it is, so "finaly" → finally, not Finlay.
      */
-    private class Candidate(val word: String, val cost: Int, val score: Double)
+    private class Candidate(val word: String, val cost: Int, val score: Double, val fromKnown: Boolean = false)
 
     private fun score(cost: Int, rank: Int) = cost + kotlin.math.log10(rank + 2.0)
 
@@ -144,7 +164,29 @@ class EnglishSuggester(
             val cost = distance(typed, target, limit)
             if (cost <= limit && words[rank] != typed) found += Candidate(words[rank], cost, score(cost, rank))
         }
+        // Longer words: the spelling list too ("backspce" → backspace). Ranked as the rarest
+        // words, so a listed word that is just as close still comes first.
+        if (typed.length >= KNOWN_FIX) {
+            for (target in knownSorted) {
+                if (kotlin.math.abs(target.length - typed.length) > maxLenDiff) continue
+                val t0 = target[0]
+                if (t0 != first && !isNeighbour(t0, first)) continue
+                val cost = distance(typed, target, limit)
+                if (cost <= limit && target != typed) found += Candidate(target, cost, score(cost, words.size), fromKnown = true)
+            }
+        }
         return found.sortedBy { it.score }.take(maxShown)
+    }
+
+    /** Spelling-list words that start with [prefix], shortest first. */
+    private fun knownStartingWith(prefix: String): List<String> {
+        var i = java.util.Arrays.binarySearch(knownSorted, prefix).let { if (it < 0) -it - 1 else it }
+        val found = ArrayList<String>()
+        while (i < knownSorted.size && knownSorted[i].startsWith(prefix) && found.size < KNOWN_SCAN) {
+            if (knownSorted[i] != prefix && '\'' !in knownSorted[i]) found += knownSorted[i]
+            i++
+        }
+        return found.sortedBy { it.length }
     }
 
     /** Edit distance with keyboard-aware costs; gives up early once over [limit]. */
@@ -193,6 +235,15 @@ class EnglishSuggester(
         /** Words this common are always left as typed. */
         private const val COMMON = 20_000
 
+        /** Spelling-list words are offered as completions from this many typed letters. */
+        private const val KNOWN_PREFIX = 4
+
+        /** How many of them are looked at before picking the shortest. */
+        private const val KNOWN_SCAN = 200
+
+        /** ...and as typo fixes for words at least this long. */
+        private const val KNOWN_FIX = 6
+
         /** How many common words that fit are considered before ranking completions. */
         private const val POOL = 12
 
@@ -211,6 +262,7 @@ class EnglishSuggester(
             extra: Sequence<String> = emptySequence(),
             used: UserWords = UserWords(),
             known: Sequence<String> = emptySequence(),
+            quiet: Sequence<String> = emptySequence(),
         ): EnglishSuggester {
             val counts = LinkedHashMap<String, Long>()
             for (line in lines) {
@@ -237,8 +289,11 @@ class EnglishSuggester(
                 val w = line.trim()
                 if (w.isNotEmpty() && !w.startsWith("#")) knownWords += w.lowercase()
             }
+            val quietWords = quiet.map { it.trim().lowercase() }
+                .filter { it.isNotEmpty() && !it.startsWith("#") }.toHashSet()
             return EnglishSuggester(
                 ordered, isManglish = isManglish, userWords = userWords, used = used, known = knownWords,
+                quiet = quietWords,
                 display = display,
             )
         }

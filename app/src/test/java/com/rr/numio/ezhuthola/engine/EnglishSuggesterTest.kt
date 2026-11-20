@@ -89,7 +89,7 @@ class EnglishSuggesterTest {
     @Test fun quietWordsAreKeptButNeverOffered() {
         val quiet = EnglishSuggester.fromTsv(
             javaClass.getResource("/en_words.tsv")!!.readText().lineSequence(),
-            known = sequenceOf("myre")
+            quiet = sequenceOf("myre")
         )
         assertEquals("myre", quiet.suggest("myre").best)
         assertTrue(quiet.suggest("my").words.none { it == "myre" })
@@ -125,6 +125,12 @@ class EnglishSuggesterTest {
         assertEquals("setting", chat.suggest("setteng").best)
         assertEquals("the", chat.suggest("teh").best)
         assertEquals("don't", chat.suggest("dont").words.first())
+    }
+
+    @Test fun genZWords() {
+        val chat = chatEnglish()
+        for (w in listOf("rizz", "delulu", "iykyk", "nocap", "fomo")) assertEquals(w, chat.suggest(w).best)
+        assertTrue("rizz" in chat.suggest("riz").words)
     }
 
     @Test fun chatWordsAreNotCorrected() {
@@ -176,9 +182,21 @@ class EnglishSuggesterTest {
         assertEquals("filch", withKnown.suggest("filch").best)
     }
 
-    @Test fun rareRealWordsAreNotSuggested() {
-        assertTrue("primly" !in withKnown.suggest("prim").words)
-        assertTrue("filch" !in withKnown.suggest("filc").words)
+    @Test fun spellingListWordsAreOfferedAfterTheMainList() {
+        // "backs" fills the strip with common words (backstage, backseat, backside);
+        // one more letter and the spelling list has room.
+        assertTrue("backspace" in withKnown.suggest("backsp").words, withKnown.suggest("backsp").words.toString())
+        assertTrue("screenshot" in withKnown.suggest("screensh").words, withKnown.suggest("screensh").words.toString())
+        // Not from 3 letters: "fil" still offers common words only.
+        assertTrue(withKnown.suggest("fil").words.none { it == "filch" })
+        // Common words still come first.
+        assertEquals("tomorrow", withKnown.suggest("tomo").words.first())
+    }
+
+    @Test fun spellingListFixesAreOfferedButNeverTypedBySpace() {
+        val s = withKnown.suggest("backspce")
+        assertTrue("backspace" in s.words, s.words.toString())
+        assertEquals("backspce", s.best)
     }
 
     @Test fun typosAreStillFixedWithTheSpellingList() {
