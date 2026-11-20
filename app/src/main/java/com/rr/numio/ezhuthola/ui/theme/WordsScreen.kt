@@ -435,9 +435,9 @@ private fun MissingTab(refreshKey: Int, outsideChanges: Int, onChanged: () -> Un
 
     Text(
         if (words.isEmpty()) {
-            "English words you type that Ezhuthola doesn't know yet will show up here, so you can add them."
+            "English words you type that Ezhuthola doesn't know yet show up here. Type one 3 times and it's learned by itself, or add it here now."
         } else {
-            "English words you typed that Ezhuthola didn't know. Add the real ones, dismiss the typos."
+            "English words Ezhuthola didn't know. Typed 3 times, a word is learned by itself. Add the real ones now, dismiss the typos."
         },
         color = TextDim,
         fontSize = 14.sp,

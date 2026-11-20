@@ -24,4 +24,10 @@ class MissingWordFilterTest {
         assertFalse(MissingWordFilter.worthNoting("getnumio", "www.getnumio"))
         assertFalse(MissingWordFilter.worthNoting("example", "mail you@example"))
     }
+
+    @Test fun learnedAfterThreeTimes() {
+        kotlin.test.assertFalse(MissingWordFilter.readyToLearn(1))
+        kotlin.test.assertFalse(MissingWordFilter.readyToLearn(2))
+        kotlin.test.assertTrue(MissingWordFilter.readyToLearn(3))
+    }
 }
