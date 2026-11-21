@@ -108,6 +108,7 @@ Full details are in [CREDITS.md](CREDITS.md); full licence texts are in the [lic
 | What | By | Licence | Used for |
 |---|---|---|---|
 | [FrequencyWords](https://github.com/hermitdave/FrequencyWords) (from [OpenSubtitles](https://www.opensubtitles.org/), 2018) | Hermit Dave | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | Malayalam and English word frequencies: `ml_words.tsv`, `en_words.tsv` (adapted, so also CC BY-SA 4.0) |
+| [US Census 1990 names](https://github.com/en-wl/wordlist/tree/v1/other), [Moby names](https://github.com/en-wl/wordlist/tree/v1/other) | US Census Bureau, Grady Ward | Public domain | Used by `tools/make_en_names.py` to spot people's names in the subtitle list, so they are never suggested: `en_names.txt` |
 | [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict) | Carnegie Mellon University | [BSD 2-clause](licenses/CMUdict-BSD.txt) | How English words sound, so English typed in Malayalam mode is spelled the Malayali way (four → ഫോർ): `en_ml_words.tsv` |
 | [ESDB / SCOWL](https://github.com/en-wl/wordlist) (size 60, American and British) | Kevin Atkinson | [ESDB licence](licenses/ESDB-SCOWL.txt) (MIT-like) | Spelling list: real English words the subtitles miss (backspace, screenshot) are left alone, not "corrected", and offered after the main list: `en_known_words.txt` |
 | [Unicode CLDR](https://github.com/unicode-org/cldr-json) annotations (CLDR 48, English and Malayalam) | Unicode, Inc. | [Unicode License v3](licenses/Unicode-License-v3.txt) | Emoji names and search keywords |

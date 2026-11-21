@@ -182,6 +182,22 @@ class EnglishSuggesterTest {
         assertEquals("filch", withKnown.suggest("filch").best)
     }
 
+    @Test fun peoplesNamesAreNeverOffered() {
+        val en = EnglishSuggester.fromTsv(
+            javaClass.getResource("/en_words.tsv")!!.readText().lineSequence(),
+            quiet = javaClass.getResource("/en_names.txt")!!.readText().lineSequence(),
+        )
+        for (prefix in listOf("heyw", "hayw", "harw")) {
+            val words = en.suggest(prefix).words.map { it.lowercase() }
+            assertTrue(words.none { it in setOf("heywood", "haywood", "harwood") }, words.toString())
+        }
+        assertEquals("Heywood", en.suggest("Heywood").best) // typed in full: left alone
+        assertTrue(en.knows("kuk"))
+        // Common names and places stay.
+        assertTrue(en.knows("david") && en.knows("london") && en.knows("sunday"))
+        assertTrue("david" in en.suggest("davi").words)
+    }
+
     @Test fun spellingListWordsAreOfferedAfterTheMainList() {
         // "backs" fills the strip with common words (backstage, backseat, backside);
         // one more letter and the spelling list has room.

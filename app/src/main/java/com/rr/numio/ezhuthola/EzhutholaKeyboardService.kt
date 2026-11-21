@@ -294,7 +294,9 @@ class EzhutholaKeyboardService : InputMethodService(), LifecycleOwner, SavedStat
             // The spelling list (backspace, screenshot): left as typed, kept off Missing words,
             // offered after the main list. Quiet words (swear words like myre): typed fine, never offered.
             val enKnown = assets.open("en_known_words.txt").bufferedReader().use { it.readLines() }
-            val enQuiet = assets.open("en_quiet_words.txt").bufferedReader().use { it.readLines() }
+            // People's names from the subtitles (Heywood, Harwood) are quiet too: never offered.
+            val enQuiet = assets.open("en_quiet_words.txt").bufferedReader().use { it.readLines() } +
+                assets.open("en_names.txt").bufferedReader().use { it.readLines() }
             english = assets.open("en_words.tsv").bufferedReader().useLines {
                 // Manglish like "poda" or "adipoli" is never "corrected" into English.
                 EnglishSuggester.fromTsv(
