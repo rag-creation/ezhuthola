@@ -399,6 +399,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            OfficialWordmark(dark = true, modifier = Modifier.padding(bottom = 4.dp).height(28.dp))
             Text("Ezhuthola $version", color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Text("Free & open source (GPL-3.0). Made by a Keralite 💛", color = TextDim, fontSize = 13.sp)
             listOf(
